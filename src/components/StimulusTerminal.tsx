@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../lib/theme';
+import DOMPurify from 'dompurify';
 
-export function StimulusTerminal() {
+export function StimulusTerminal({ account }: { account?: string }) {
   const { theme } = useTheme();
   const [input, setInput] = useState('');
+  const [selectedModel, setSelectedModel] = useState('Antigravity');
   const [logs, setLogs] = useState<{id: number, text: string, type: 'user'|'system'|'amygdala'|'left'|'right'}[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const logId = useRef(0);
@@ -22,8 +24,12 @@ export function StimulusTerminal() {
     e.preventDefault();
     if (!input.trim()) return;
 
-    addLog(`> ${input}`, 'user');
-    const stimulus = input;
+    // Security: Sanitize all user inputs before processing or displaying
+    const cleanInput = DOMPurify.sanitize(input.trim());
+    if (!cleanInput) return; // Ignore if input was entirely stripped by sanitizer
+
+    addLog(`> ${cleanInput}`, 'user');
+    const stimulus = cleanInput;
     setInput('');
 
     // Simulate Agent Brain Process
@@ -49,9 +55,9 @@ export function StimulusTerminal() {
       else {
         addLog('[AMYGDALA] No immediate threat.', 'amygdala');
         setTimeout(() => {
-          addLog('[LEFT BRAIN] Analyzing semantic payload...', 'left');
+          addLog(`[LEFT BRAIN] Analyzing semantic payload for ${selectedModel}...`, 'left');
           setTimeout(() => {
-            addLog('🟢 TRUST: Tôi đã hiểu và lưu thông tin này vào Working Memory.', 'system');
+            addLog(`🟢 TRUST: [${selectedModel}] Tôi đã hiểu và lưu thông tin này vào Working Memory.`, 'system');
           }, 500);
         }, 500);
       }
@@ -60,10 +66,30 @@ export function StimulusTerminal() {
 
   return (
     <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <h2 style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1rem', marginBottom: '1rem' }}>Stimulus Terminal (Agent Interface)</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+        <h2>Personal Brain Terminal {account ? `(${account.slice(0, 6)}...${account.slice(-4)})` : ''}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Interacting Model:</span>
+          <select 
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            style={{ 
+              background: 'var(--bg-elevated)', 
+              color: 'var(--text)', 
+              border: '1px solid var(--border)',
+              padding: '0.25rem 0.5rem',
+              borderRadius: '4px'
+            }}
+          >
+            <option value="Antigravity">Antigravity</option>
+            <option value="OpenClaw">OpenClaw</option>
+            <option value="Gemini Chat">Gemini Chat API</option>
+          </select>
+        </div>
+      </div>
       
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', background: '#0a0a0a', padding: '1rem', borderRadius: '4px', fontFamily: 'monospace', marginBottom: '1rem' }}>
-        {logs.length === 0 && <div style={{ color: 'var(--text-dim)' }}>System ready. Awaiting input stimulus...</div>}
+        {logs.length === 0 && <div style={{ color: 'var(--text-dim)' }}>Personal Brain [MemWal] online. {selectedModel} model connected. Awaiting input stimulus...</div>}
         {logs.map(log => (
           <div key={log.id} style={{ 
             marginBottom: '0.5rem',

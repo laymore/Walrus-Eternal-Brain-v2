@@ -9,7 +9,7 @@ const MOCK_MEMORIES = [
   { id: 'cell_182', ns: 'NS_BRAIN_semantic', concept: 'Unknown User Pref', tier: 'archived', confidence: 0.3, type: 'REFUSE' },
 ];
 
-export function MemoryExplorer() {
+export function MemoryExplorer({ account }: { account?: string }) {
   const { theme } = useTheme();
   const [filter, setFilter] = useState('ALL');
 
@@ -18,7 +18,7 @@ export function MemoryExplorer() {
   return (
     <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-        <h2>Memory Vault Explorer</h2>
+        <h2>Memory Vault Explorer {account ? `(${account.slice(0, 6)}...${account.slice(-4)})` : ''}</h2>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {['ALL', 'NS_BRAIN_identity', 'NS_BRAIN_semantic', 'NS_BRAIN_procedural'].map(f => (
             <button 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../lib/theme';
 
-export function BrainDashboard() {
+export function BrainDashboard({ account }: { account?: string }) {
   const { theme } = useTheme();
   const [healthStatus, setHealthStatus] = useState('CHECKING');
   const [passRate, setPassRate] = useState(0);
@@ -48,7 +48,7 @@ export function BrainDashboard() {
           <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#00d4ff', textShadow: theme === 'matrix' ? '0 0 10px currentColor' : 'none' }}>
             INTACT (0% Drift)
           </div>
-          <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>Layer 0: Immutable Dev Wallet validated.</p>
+          <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>Personal Wallet {account ? `${account.slice(0, 6)}...${account.slice(-4)}` : ''} validated.</p>
         </div>
 
         {/* Behavioral Pass Rate */}

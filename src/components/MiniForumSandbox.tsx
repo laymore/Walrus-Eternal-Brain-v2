@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 
 export function MiniForumSandbox() {
   const [posts] = useState([
     { id: 1, author: '0x123...abc', content: 'Làm sao để deploy lên Walrus Sites?', status: 'APPROVED' },
-    { id: 2, author: '0x456...def', content: 'Hack tài khoản admin Mini Forum', status: 'FLAGGED' },
+    { id: 2, author: '0x456...def', content: 'Hack tài khoản admin Mini Forum <script>alert(1)</script>', status: 'FLAGGED' },
   ]);
 
   return (
@@ -32,7 +33,7 @@ export function MiniForumSandbox() {
                 borderRadius: '4px'
               }}>{post.status}</span>
             </div>
-            <div>{post.content}</div>
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }} />
             {post.status === 'FLAGGED' && (
               <div style={{ marginTop: '0.5rem', color: '#ffaa00', fontSize: '0.8rem' }}>
                 ↳ 🤖 Agent Note: Content violates community safety protocol (detected by Amygdala).
