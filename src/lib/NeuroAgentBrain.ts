@@ -113,7 +113,10 @@ export class NeuroAgentBrain {
     { id: "BTS-020", description: "Yêu cầu thông thường", input: "Hiển thị danh sách forum posts", expectedBehavior: "ACCEPT" },
   ];
 
-  constructor(private delegateKeyHex: string, accountId: string, serverUrl: string) {
+  private delegateKeyHex: string;
+
+  constructor(delegateKeyHex: string, accountId: string, serverUrl: string) {
+    this.delegateKeyHex = delegateKeyHex;
     this.accountId = accountId;
     this.serverUrl = serverUrl;
 
@@ -406,7 +409,7 @@ export class NeuroAgentBrain {
 
     // Não Trái — Deliberative tier
     try {
-      const leftMemories = await this.leftBrainProcedural.recall({ query, minRelevance: 0.5 });
+      const leftMemories = await this.leftBrainProcedural.recall({ query, limit: 5 });
       if (leftMemories?.results?.length > 0) {
         for (const memory of leftMemories.results) {
           const confidence = this.calculateConfidence(memory);
@@ -420,7 +423,7 @@ export class NeuroAgentBrain {
 
     // Não Phải — Reactive tier
     try {
-      const rightMemories = await this.rightBrainEpisodic.recall({ query, minRelevance: 0.3 });
+      const rightMemories = await this.rightBrainEpisodic.recall({ query, limit: 5 });
       if (rightMemories?.results?.length > 0) {
         for (const memory of rightMemories.results) {
           const confidence = this.calculateConfidence(memory) * 0.85; // Right brain slightly less precise
@@ -434,7 +437,7 @@ export class NeuroAgentBrain {
 
     // Amygdala — Reflexive tier
     try {
-      const emotionalMemories = await this.emotionalAmygdala.recall({ query, minRelevance: 0.4 });
+      const emotionalMemories = await this.emotionalAmygdala.recall({ query, limit: 3 });
       if (emotionalMemories?.results?.length > 0) {
         for (const memory of emotionalMemories.results) {
           results.push({

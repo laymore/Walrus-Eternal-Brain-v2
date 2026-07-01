@@ -1,29 +1,27 @@
 import { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { NS_01_LobbyChat } from './components/NS_01_LobbyChat';
-import { NS_02_NewsFeed } from './components/NS_02_NewsFeed';
-import { NS_02_ForumPosts } from './components/NS_02_ForumPosts';
-import { NS_19_XTimeline } from './components/NS_19_XTimeline';
-import { NS_04_GameEvents } from './components/NS_04_GameEvents';
-import { NS_07_Moderation } from './components/NS_07_Moderation';
+import { BrainDashboard } from './components/BrainDashboard';
+import { MemoryExplorer } from './components/MemoryExplorer';
+import { StimulusTerminal } from './components/StimulusTerminal';
+import { MiniForumSandbox } from './components/MiniForumSandbox';
 import { ToastProvider, NotifierBinder } from './lib/toast';
-import { ConnectButton } from '@mysten/dapp-kit';
+import { ConnectButton, useCurrentAccount } from '@mysten/dapp-kit';
 import { useTheme } from './lib/theme';
 import { ThemeSelector } from './components/ThemeSelector';
+import { WalletIdentity } from './components/WalletIdentity';
 
 function AppShell() {
-  const [activeTab, setActiveTab] = useState('NS_02_NEWS');
+  const [activeTab, setActiveTab] = useState('DASHBOARD');
   const { theme, setTheme } = useTheme();
+  const account = useCurrentAccount();
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'NS_01': return <NS_01_LobbyChat />;
-      case 'NS_02_NEWS': return <NS_02_NewsFeed />;
-      case 'NS_02_FORUM': return <NS_02_ForumPosts />;
-      case 'NS_19_X': return <NS_19_XTimeline />;
-      case 'NS_04_EVENTS': return <NS_04_GameEvents />;
-      case 'NS_07': return <NS_07_Moderation />;
-      default: return <NS_02_NewsFeed />;
+      case 'DASHBOARD': return <BrainDashboard />;
+      case 'VAULT': return <MemoryExplorer />;
+      case 'TERMINAL': return <StimulusTerminal />;
+      case 'SANDBOX': return <MiniForumSandbox />;
+      default: return <BrainDashboard />;
     }
   };
 
@@ -45,7 +43,7 @@ function AppShell() {
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-            <img src="/favicon.svg" width={44} height={44} alt="Mini Forum" />
+            <img src="/favicon.svg" width={44} height={44} alt="Agentic OS" />
           </div>
           <div>
             <div style={{
@@ -58,7 +56,7 @@ function AppShell() {
               fontFamily: theme === 'autobots' ? 'Orbitron, sans-serif' : 'inherit',
               textShadow: '0 0 10px rgba(0,212,255,0.4)',
             }}>
-              {'>'} Mini Forum
+              {'>'} Agentic OS
             </div>
             <div style={{
               fontSize: '0.8rem',
@@ -66,11 +64,12 @@ function AppShell() {
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
             }}>
-              {'>'} by Team Autobots
+              {'>'} Powered by Eternal Brain
             </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <WalletIdentity address={account?.address || ''} />
           <ThemeSelector currentTheme={theme} onSelectTheme={setTheme} />
           <ConnectButton className="btn btn--secondary" />
         </div>

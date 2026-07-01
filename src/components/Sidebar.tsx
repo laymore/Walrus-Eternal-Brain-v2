@@ -1,79 +1,71 @@
-import React from 'react';
-import { MessageSquare, Newspaper, Trophy, MessageCircle, Shield } from 'lucide-react';
-import { useCurrentAccount } from '../lib/dappKitMock';
+
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
 
-const navItems = [
-  { id: 'NS_01', icon: MessageCircle, label: 'Public Chat' },
-  { id: 'NS_02_NEWS', icon: Newspaper, label: '📰 News & Updates' },
-  { id: 'NS_02_FORUM', icon: MessageSquare, label: '💬 Forum Discussions' },
-  { id: 'NS_19_X', icon: () => React.createElement('span', { style: { fontSize: '1rem' } }, '𝗓'), label: '𝗓 Sui Community' },
-  { id: 'NS_04_EVENTS', icon: Trophy, label: '🏆 Game Events' },
-] as const;
-
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
-  const account = useCurrentAccount();
+export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const tabs = [
+    { id: 'DASHBOARD', label: 'Watchdog Dashboard', icon: '🖥️' },
+    { id: 'VAULT', label: 'Memory Explorer', icon: '🧠' },
+    { id: 'TERMINAL', label: 'Stimulus Terminal', icon: '⚡' },
+    { id: 'SANDBOX', label: 'Forum Sandbox', icon: '🧪' },
+  ];
 
   return (
-    <nav className="matrix-panel" style={{
-      width: '17rem',
-      padding: '0.73rem',
+    <aside style={{
+      width: '260px',
+      background: 'var(--bg-elevated)',
+      borderRadius: '8px',
+      padding: '1.1rem',
       display: 'flex',
       flexDirection: 'column',
-      gap: '0.23rem',
+      gap: '0.75rem',
       flexShrink: 0,
+      border: '1px solid var(--border)',
     }}>
       <div style={{
-        fontSize: '0.75rem',
-        color: 'var(--text-muted)',
+        fontSize: '0.8rem',
         textTransform: 'uppercase',
-        letterSpacing: '0.12em',
-        padding: '0.33rem 0.5rem 0.5rem',
-        borderBottom: '1px solid var(--border)',
-        marginBottom: '0.33rem',
+        letterSpacing: '0.1em',
+        color: 'var(--text-dim)',
+        marginBottom: '0.5rem',
+        paddingLeft: '0.5rem'
       }}>
-        Channels
+        Agentic OS Modules
       </div>
-
-      {navItems.map(({ id, icon: Icon, label }) => (
+      
+      {tabs.map(tab => (
         <button
-          key={id}
-          className={`sidebar-btn${activeTab === id ? ' sidebar-btn--active' : ''}`}
-          onClick={() => setActiveTab(id)}
+          key={tab.id}
+          className={`sidebar-item ${activeTab === tab.id ? 'active' : ''}`}
+          onClick={() => setActiveTab(tab.id)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '0.75rem 1rem',
+            background: activeTab === tab.id ? 'var(--primary)' : 'transparent',
+            color: activeTab === tab.id ? '#000' : 'var(--text)',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            textAlign: 'left',
+            fontWeight: activeTab === tab.id ? 'bold' : 'normal',
+            transition: 'all 0.2s ease'
+          }}
         >
-          <Icon size={15} />
-          {label}
+          <span style={{ fontSize: '1.2rem' }}>{tab.icon}</span>
+          <span>{tab.label}</span>
         </button>
       ))}
 
-      {/* Moderation & Jammer — visible to all connected users (admin gets extra features inside) */}
-      {account && (
-        <button
-          className={`sidebar-btn${activeTab === 'NS_07' ? ' sidebar-btn--active' : ''}`}
-          onClick={() => setActiveTab('NS_07')}
-        >
-          <Shield size={15} />
-          Moderation
-        </button>
-      )}
-
-      <div style={{
-        marginTop: 'auto',
-        fontSize: '0.65rem',
-        color: 'var(--text-dim)',
-        padding: '0.67rem 0.5rem',
-        borderTop: '1px solid var(--border)',
-        textAlign: 'center',
-        letterSpacing: '0.1em',
-        lineHeight: 2,
-      }}>
-        <div>{'>'} chats.wal.app</div>
-        <div>{'>'} Walrus Memory</div>
+      <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textAlign: 'center' }}>
+          Antigravity Eternal Brain v1.0
+        </div>
       </div>
-    </nav>
+    </aside>
   );
-};
+}
