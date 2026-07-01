@@ -1,0 +1,12 @@
+--make-move-vec "<0x1::option::Option<0x1::string::String>>" "[]" --assign link
+--assign img link
+--assign desc link
+--assign proj link
+--assign creator link
+--move-call "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27::metadata::new_metadata" link img desc proj creator
+--assign meta
+--move-call "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27::site::new_site" "Walrus Forum" meta
+--assign site
+--transfer-objects "[site]" "0xfbf73b2f72858a4dbbcb4b942985bd46f410e7210fe01f8340f91946faec115f"
+--gas-budget 100000000
+--json

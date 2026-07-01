@@ -1,0 +1,31 @@
+{
+  "kind": "ProgrammableTransaction",
+  "inputs": [
+    {"type": "pure", "valueType": "std::option::Option<std::string::String>", "value": null},
+    {"type": "pure", "valueType": "std::option::Option<std::string::String>", "value": null},
+    {"type": "pure", "valueType": "std::option::Option<std::string::String>", "value": null},
+    {"type": "pure", "valueType": "std::option::Option<std::string::String>", "value": null},
+    {"type": "pure", "valueType": "std::option::Option<std::string::String>", "value": null},
+    {"type": "pure", "valueType": "std::string::String", "value": "Walrus Forum"},
+    {"type": "pure", "valueType": "address", "value": "0xfbf73b2f72858a4dbbcb4b942985bd46f410e7210fe01f8340f91946faec115f"}
+  ],
+  "transactions": [
+    {
+      "kind": "MoveCall",
+      "target": "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27::metadata::new_metadata",
+      "arguments": [{"Input": 0}, {"Input": 1}, {"Input": 2}, {"Input": 3}, {"Input": 4}],
+      "typeArguments": []
+    },
+    {
+      "kind": "MoveCall",
+      "target": "0x26eb7ee8688da02c5f671679524e379f0b837a12f1d1d799f255b7eea260ad27::site::new_site",
+      "arguments": [{"Input": 5}, {"NestedResult": [0, 0]}],
+      "typeArguments": []
+    },
+    {
+      "kind": "TransferObjects",
+      "objects": [{"NestedResult": [1, 0]}],
+      "address": {"Input": 6}
+    }
+  ]
+}
