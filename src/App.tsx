@@ -46,18 +46,67 @@ function AppShell() {
 
     if (!hasBrain) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🧬</div>
-          <h2 style={{ marginBottom: '1rem', color: 'var(--text)' }}>No Personal Brain Found</h2>
-          <p style={{ maxWidth: '400px', textAlign: 'center', marginBottom: '2rem' }}>
-            Wallet <strong>{account.address.slice(0, 6)}...{account.address.slice(-4)}</strong> does not have an initialized MemWal Brain. Create one to begin.
-          </p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4rem 2rem', height: '100%', color: 'var(--text-dim)', background: '#000' }}>
+          <h1 style={{ color: 'var(--text)', marginBottom: '0.5rem', fontSize: '2.5rem', alignSelf: 'flex-start', maxWidth: '800px', width: '100%', margin: '0 auto' }}>Welcome to your Dashboard</h1>
+          <p style={{ marginBottom: '2rem', alignSelf: 'flex-start', maxWidth: '800px', width: '100%', margin: '0 auto 2rem auto' }}>Manage your Walrus Memory account and delegate keys</p>
+          
+          <div style={{ 
+            background: '#e9f85c', 
+            color: '#000', 
+            padding: '1rem', 
+            borderRadius: '4px', 
+            width: '100%', 
+            maxWidth: '800px', 
+            marginBottom: '2rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+          }}>
+            <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+            <span style={{ fontWeight: 500 }}>No Walrus Memory account found for this wallet. Create a delegate key to get started.</span>
+          </div>
+
           <button 
-            className="btn btn--primary" 
+            style={{
+              background: '#111',
+              border: '1px solid #222',
+              borderRadius: '8px',
+              padding: '1.5rem',
+              width: '100%',
+              maxWidth: '800px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              cursor: isCreatingBrain ? 'wait' : 'pointer',
+              color: 'var(--text)',
+              textAlign: 'left',
+              transition: 'background 0.2s',
+            }}
             onClick={handleCreateBrain}
             disabled={isCreatingBrain}
+            onMouseOver={(e) => e.currentTarget.style.background = '#1a1a1a'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#111'}
           >
-            {isCreatingBrain ? 'Initializing Namespaces...' : 'Create Personal Brain'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ 
+                border: '1px solid #333', 
+                borderRadius: '50%', 
+                width: '40px', 
+                height: '40px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                🗝️
+              </div>
+              <div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>Create a delegate key</div>
+                <div style={{ color: '#888', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                  {isCreatingBrain ? 'Generating and registering a new SDK key...' : 'Generate and register a new SDK key'}
+                </div>
+              </div>
+            </div>
+            <span style={{ fontSize: '1.5rem', color: '#666' }}>→</span>
           </button>
         </div>
       );
