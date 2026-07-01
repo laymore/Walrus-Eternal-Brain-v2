@@ -8,7 +8,7 @@ import { ConnectButton, useCurrentAccount } from '@mysten/dapp-kit';
 import { useTheme } from './lib/theme';
 import { ThemeSelector } from './components/ThemeSelector';
 import { WalletIdentity } from './components/WalletIdentity';
-import { MemoryItem } from './types';
+import type { MemoryItem } from './types';
 
 const INITIAL_MEMORIES: MemoryItem[] = [
   { id: 'cell_178', ns: 'NS_BRAIN_identity', concept: 'Dev Wallet', tier: 'hot', confidence: 1.0, type: 'TRUST' },

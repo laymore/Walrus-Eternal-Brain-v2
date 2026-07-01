@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTheme } from '../lib/theme';
 
-import { MemoryItem } from '../types';
+import type { MemoryItem } from '../types';
 
 export function MemoryExplorer({ 
   account, 

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { MemoryItem } from '../types';
+import type { MemoryItem } from '../types';
+import { useTheme } from '../lib/theme';
+import DOMPurify from 'dompurify';
 
 export function StimulusTerminal({ 
   account,
@@ -8,6 +10,8 @@ export function StimulusTerminal({
   account?: string,
   addMemory: (memory: Omit<MemoryItem, 'id'>) => void 
 }) {
+  useTheme();
+  const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState('Antigravity');
   const [logs, setLogs] = useState<{id: number, text: string, type: 'user'|'system'|'amygdala'|'left'|'right'}[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
