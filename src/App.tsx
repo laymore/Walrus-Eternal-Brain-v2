@@ -3,7 +3,6 @@ import { Sidebar } from './components/Sidebar';
 import { BrainDashboard } from './components/BrainDashboard';
 import { MemoryExplorer } from './components/MemoryExplorer';
 import { StimulusTerminal } from './components/StimulusTerminal';
-import { MiniForumSandbox } from './components/MiniForumSandbox';
 import { ToastProvider, NotifierBinder } from './lib/toast';
 import { ConnectButton, useCurrentAccount } from '@mysten/dapp-kit';
 import { useTheme } from './lib/theme';
@@ -134,7 +133,6 @@ function AppShell() {
       case 'DASHBOARD': return <BrainDashboard account={account.address} />;
       case 'VAULT': return <MemoryExplorer account={account.address} memories={memories} setMemories={setMemories} />;
       case 'TERMINAL': return <StimulusTerminal account={account.address} addMemory={addMemory} />;
-      case 'SANDBOX': return <MiniForumSandbox />;
       default: return <BrainDashboard account={account.address} />;
     }
   };

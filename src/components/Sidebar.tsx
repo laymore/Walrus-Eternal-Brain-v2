@@ -7,10 +7,9 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const tabs = [
-    { id: 'DASHBOARD', label: 'Watchdog Dashboard', icon: '🖥️' },
+    { id: 'DASHBOARD', label: 'Brain Health', icon: '🖥️' },
     { id: 'VAULT', label: 'Memory Explorer', icon: '🧠' },
     { id: 'TERMINAL', label: 'Stimulus Terminal', icon: '⚡' },
-    { id: 'SANDBOX', label: 'Forum Sandbox', icon: '🧪' },
   ];
 
   return (
@@ -33,7 +32,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         marginBottom: '0.5rem',
         paddingLeft: '0.5rem'
       }}>
-        Agentic OS Modules
+        Brain Management
       </div>
       
       {tabs.map(tab => (
@@ -63,7 +62,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
       <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textAlign: 'center' }}>
-          Antigravity Eternal Brain v1.0
+          Eternal Agent Brain v1.1
         </div>
       </div>
     </aside>

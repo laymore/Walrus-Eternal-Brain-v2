@@ -98,8 +98,10 @@ const PROCEDURAL_SKILLS = [
     description: "Đưa DApp lên Walrus Storage",
     steps: [
       "Build DApp ra thư mục dist",
+      "KIỂM TRA VÍ BẮT BUỘC: Chạy `sui client active-address`. Đảm bảo ví đang dùng là `0xfbf73b2f72858a4dbbcb4b942985bd46f410e7210fe01f8340f91946faec115f` (DEV Wallet của Walrus Forum). NẾU LÀ VÍ KHÁC (VD: 0xafbc...), PHẢI DÙNG `sui client switch --address 0xfbf7...` TRƯỚC KHI DEPLOY.",
+      "KIỂM TRA SITE ID: Đảm bảo Site ID là `0x19316f2a859e0d3993efce3afe2e24b820ed078fc13329671a568c6984846d53` và khớp với domain `chats.sui`.",
       "Chạy lệnh: site-builder publish ./dist",
-      "Để update giữ nguyên Object ID: site-builder update <ObjectID> ./dist",
+      "Để update giữ nguyên Object ID: site-builder update <ObjectID> ./dist --epochs 1",
       "Link với SuiNS: sui client call --package <suins_pkg> --module suins --function register_site..."
     ],
     tags: ["sui", "walrus", "sites", "deployment"],

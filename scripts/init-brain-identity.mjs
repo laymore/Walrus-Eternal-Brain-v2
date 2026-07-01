@@ -72,7 +72,8 @@ const IDENTITY = {
     "Dự án chỉ có DUY NHẤT 1 ví dev quản lý tất cả",
     "Mọi tương tác on-chain phải switch về ví dev trước: sui client switch --address 0xfbf73b...",
     "Các ví khác chỉ hiển thị tên ví hoặc SuiNS, KHÔNG được đặt tên custom",
-    "Nếu lấy nhầm ví dev của dự án khác → NGUY HIỂM, phải kiểm tra kỹ",
+    "CẢNH BÁO TỐI QUAN TRỌNG: Ví 0xafbc48fd349fb44ce9c6f2b33423e6ae7c826d53a25920a0d4c3c475e40889c5 là của website KHÁC. TUYỆT ĐỐI KHÔNG DÙNG ví này để deploy cho Walrus Forum.",
+    "TRƯỚC KHI DEPLOY WALRUS SITES: Luôn luôn kiểm tra `sui client active-address` và đảm bảo Site ID (0x19316f2a859e0d3993efce3afe2e24b820ed078fc13329671a568c6984846d53) khớp với domain chats.sui."
   ],
   
   // INFRASTRUCTURE
