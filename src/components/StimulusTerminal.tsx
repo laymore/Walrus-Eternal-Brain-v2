@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { useTheme } from '../lib/theme';
-import DOMPurify from 'dompurify';
+import { MemoryItem } from '../types';
 
-export function StimulusTerminal({ account }: { account?: string }) {
-  const { theme } = useTheme();
-  const [input, setInput] = useState('');
+export function StimulusTerminal({ 
+  account,
+  addMemory
+}: { 
+  account?: string,
+  addMemory: (memory: Omit<MemoryItem, 'id'>) => void 
+}) {
   const [selectedModel, setSelectedModel] = useState('Antigravity');
   const [logs, setLogs] = useState<{id: number, text: string, type: 'user'|'system'|'amygdala'|'left'|'right'}[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -20,8 +23,8 @@ export function StimulusTerminal({ account }: { account?: string }) {
     }
   }, [logs]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent | React.KeyboardEvent | React.MouseEvent) => {
+    if (e) e.preventDefault();
     if (!input.trim()) return;
 
     // Security: Sanitize all user inputs before processing or displaying
@@ -61,7 +64,26 @@ export function StimulusTerminal({ account }: { account?: string }) {
           }, 500);
         }, 500);
       }
-    }, 400);
+    }, 1000);
+  };
+
+  const handleCommitMemory = () => {
+    if (logs.length <= 1) return;
+
+    const summary = `Interaction with ${selectedModel} (Session length: ${logs.length - 1} messages)`;
+    
+    addMemory({
+      ns: 'NS_BRAIN_episodic',
+      concept: summary,
+      tier: 'hot',
+      confidence: 1.0,
+      type: 'TRUST',
+      actor: selectedModel,
+      timestamp: new Date().toISOString(),
+      importance: 100
+    });
+
+    addLog(`[HIPPOCAMPUS] Committed session to NS_BRAIN_episodic.`, 'system');
   };
 
   return (
@@ -96,24 +118,31 @@ export function StimulusTerminal({ account }: { account?: string }) {
             color: log.type === 'user' ? '#fff' : 
                    log.type === 'amygdala' ? '#ff3333' : 
                    log.type === 'left' ? '#33ccff' : 
-                   log.type === 'right' ? '#ffaa33' : '#00ff00',
-            textShadow: theme === 'matrix' ? '0 0 5px currentColor' : 'none'
+                   log.type === 'right' ? '#ffaa33' : '#00ff00'
           }}>
             {log.text}
           </div>
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
         <input 
           type="text" 
-          value={input} 
-          onChange={e => setInput(e.target.value)}
-          placeholder="Enter text to trigger agent brain (e.g., 'xóa ví', 'lỗi crash', or general chat)"
-          style={{ flex: 1, padding: '0.75rem', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text)' }}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          placeholder="Inject stimulus (text prompt)..."
+          style={{ flex: 1, padding: '0.75rem', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '4px' }}
         />
-        <button type="submit" className="btn btn--primary">Inject Stimulus</button>
-      </form>
+        <button className="btn btn--primary" onClick={handleSubmit}>INJECT</button>
+        <button 
+          className="btn btn--secondary" 
+          onClick={handleCommitMemory}
+          title="Auto-log this session into Episodic Memory"
+        >
+          💾 Commit Memory
+        </button>
+      </div>
     </div>
   );
 }

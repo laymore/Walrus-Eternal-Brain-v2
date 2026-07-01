@@ -9,6 +9,15 @@ import { ConnectButton, useCurrentAccount } from '@mysten/dapp-kit';
 import { useTheme } from './lib/theme';
 import { ThemeSelector } from './components/ThemeSelector';
 import { WalletIdentity } from './components/WalletIdentity';
+import { MemoryItem } from './types';
+
+const INITIAL_MEMORIES: MemoryItem[] = [
+  { id: 'cell_178', ns: 'NS_BRAIN_identity', concept: 'Dev Wallet', tier: 'hot', confidence: 1.0, type: 'TRUST' },
+  { id: 'cell_179', ns: 'NS_BRAIN_semantic', concept: 'Eternal Architecture', tier: 'warm', confidence: 0.9, type: 'TRUST' },
+  { id: 'cell_180', ns: 'NS_BRAIN_procedural', concept: 'UI Build Protocol', tier: 'cold', confidence: 0.7, type: 'VERIFY' },
+  { id: 'cell_181', ns: 'NS_BRAIN_episodic', concept: 'Crash Error Log', tier: 'hot', confidence: 0.95, type: 'TRUST', timestamp: '2026-07-01T10:00:00Z', actor: 'System', importance: 80 },
+  { id: 'cell_182', ns: 'NS_BRAIN_semantic', concept: 'Unknown User Pref', tier: 'archived', confidence: 0.3, type: 'REFUSE' },
+];
 
 function AppShell() {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
@@ -16,6 +25,15 @@ function AppShell() {
   const account = useCurrentAccount();
   const [hasBrain, setHasBrain] = useState(false);
   const [isCreatingBrain, setIsCreatingBrain] = useState(false);
+  const [memories, setMemories] = useState<MemoryItem[]>(INITIAL_MEMORIES);
+
+  const addMemory = (memory: Omit<MemoryItem, 'id'>) => {
+    const newMemory: MemoryItem = {
+      ...memory,
+      id: `cell_${Date.now()}`
+    };
+    setMemories(prev => [newMemory, ...prev]);
+  };
 
   // Reset brain state if account changes
   useEffect(() => {
@@ -114,8 +132,8 @@ function AppShell() {
 
     switch (activeTab) {
       case 'DASHBOARD': return <BrainDashboard account={account.address} />;
-      case 'VAULT': return <MemoryExplorer account={account.address} />;
-      case 'TERMINAL': return <StimulusTerminal account={account.address} />;
+      case 'VAULT': return <MemoryExplorer account={account.address} memories={memories} setMemories={setMemories} />;
+      case 'TERMINAL': return <StimulusTerminal account={account.address} addMemory={addMemory} />;
       case 'SANDBOX': return <MiniForumSandbox />;
       default: return <BrainDashboard account={account.address} />;
     }
