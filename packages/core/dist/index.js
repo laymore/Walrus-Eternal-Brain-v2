@@ -1,4 +1,7 @@
 import { MemWal } from "@mysten-incubation/memwal";
+// Canonical book id from a title — MUST match scripts/book-evolve.mjs slug()
+// so pre-book_id records resolve to the same neuron as later versions.
+const bookIdFromTitle = (t) => `book:${String(t || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 /**
  * Project the universal identity into a framework-native shape. Reads V2
  * sections, falling back to legacy flat fields, so v1/v2/V2 identities all work.
@@ -116,7 +119,7 @@ export class WalrusEternalBrain {
                 continue;
             }
             if (j?.type === "LIBRARY_BOOK") {
-                const id = j.book_id || `book:${String(j.title || "untitled").toLowerCase()}`;
+                const id = j.book_id || bookIdFromTitle(j.title);
                 const cur = latest.get(id);
                 if (!cur || (j.version || 1) > (cur.version || 1))
                     latest.set(id, { ...j, book_id: id });
@@ -165,7 +168,7 @@ export class WalrusEternalBrain {
         catch {
             return null;
         } })
-            .filter((x) => x?.type === "LIBRARY_BOOK" && (x.book_id || `book:${String(x.title || "").toLowerCase()}`) === bookId)
+            .filter((x) => x?.type === "LIBRARY_BOOK" && (x.book_id || bookIdFromTitle(x.title)) === bookId)
             .sort((a, b) => (a.version || 1) - (b.version || 1));
     }
     /**
@@ -229,41 +232,64 @@ export class WalrusEternalBrain {
      * any single project — before touching its own session memory.
      */
     async consultLibrary(problem, limit = 8) {
-        const hits = await this.eternalLibrary.recall({
-            query: problem,
-            maxDistance: LIBRARY_MAX_DISTANCE,
-            limit,
-        });
-        if (!hits.results.length) {
-            return "📚 Thư viện vĩnh cửu chưa có sách liên quan đến vấn đề này.";
-        }
-        // Resolve each book_id to its LATEST version (books are append-only /
-        // versioned — a neuron can evolve; only the newest page is authoritative).
-        const latestByBook = new Map();
+        // TWO-TIER retrieval — the "keyword wakes the book" mechanic:
+        //  Tier 1 (keyword): exact token matches on tags/title. Precise, cheap,
+        //          and the ONLY thing that can wake a SLEEPING book.
+        //  Tier 2 (vector): semantic recall for association — but sleeping books
+        //          stay asleep here (forgetting is a privilege, not data loss).
+        const keywords = problem.toLowerCase().split(/\W+/).filter((w) => w.length > 2);
+        const kwScore = (b) => {
+            const hay = [String(b.title || "").toLowerCase(), ...(b.tags || []).map((t) => String(t).toLowerCase())];
+            let score = 0;
+            for (const kw of keywords)
+                if (hay.some((h) => h.includes(kw)))
+                    score++;
+            return score;
+        };
+        // Full shelf (latest version per book) for the keyword tier.
+        const shelf = await this.fetchLibraryNeurons();
+        const byId = new Map(shelf.nodes.map((n) => [n.id, n]));
+        // Vector tier for association.
+        const hits = await this.eternalLibrary.recall({ query: problem, maxDistance: LIBRARY_MAX_DISTANCE, limit });
+        const vecIds = new Set();
         const plain = [];
         for (const h of hits.results) {
-            let book = null;
+            let rec = null;
             try {
-                book = JSON.parse(h.text);
+                rec = JSON.parse(h.text);
             }
             catch { /* plain distilled fact */ }
-            if (book && book.type === "LIBRARY_BOOK") {
-                const id = book.book_id || `book:${String(book.title || "untitled").toLowerCase()}`;
-                const cur = latestByBook.get(id);
-                if (!cur || (book.version || 1) > (cur.version || 1))
-                    latestByBook.set(id, book);
-            }
-            else if (book?.type === "BOOK_LINK") {
-                /* lineage edges are for the graph, not consult text */
-            }
-            else {
+            if (rec?.type === "LIBRARY_BOOK")
+                vecIds.add(rec.book_id || bookIdFromTitle(rec.title));
+            else if (rec?.type !== "BOOK_LINK")
                 plain.push(`\n• ${h.text}`);
-            }
+        }
+        // Merge & rank: keyword hits first (they also WAKE sleeping books);
+        // vector-only hits follow, but skip books that are asleep.
+        const ranked = [];
+        for (const b of byId.values()) {
+            const score = kwScore(b);
+            const inVec = vecIds.has(b.id);
+            const sleeping = b.status === "sleeping";
+            if (score > 0)
+                ranked.push({ book: b, score: score + (inVec ? 0.5 : 0), woke: sleeping });
+            else if (inVec && !sleeping)
+                ranked.push({ book: b, score: 0, woke: false });
+        }
+        ranked.sort((a, z) => z.score - a.score);
+        const top = ranked.slice(0, limit);
+        if (!top.length && !plain.length) {
+            return "📚 Thư viện vĩnh cửu chưa có sách liên quan đến vấn đề này.";
         }
         const lines = ["=== 📚 SÁCH THAM KHẢO TỪ THƯ VIỆN VĨNH CỬU (cross-project) ==="];
-        for (const book of latestByBook.values()) {
-            const prov = [book.origin, book.source_model].filter(Boolean).join("/");
-            lines.push(`\n📖 ${book.title}  v${book.version || 1}  [${(book.tags || []).join(", ")}]${prov ? `  (nguồn: ${prov})` : ""}`);
+        for (const { book, score, woke } of top) {
+            const prov = [book.origin].filter(Boolean).join("/");
+            const badges = [
+                score > 0 ? `🔑 keyword×${Math.floor(score)}` : "≈ semantic",
+                woke ? "😴→⏰ woke from sleep" : "",
+                book.status === "building" ? "🚧 building" : "",
+            ].filter(Boolean).join(" · ");
+            lines.push(`\n📖 ${book.label || book.title}  v${book.version || 1}  [${(book.tags || []).join(", ")}]  (${badges}${prov ? ` · ${prov}` : ""})`);
             lines.push(String(book.content ?? "").trim());
         }
         lines.push(...plain);

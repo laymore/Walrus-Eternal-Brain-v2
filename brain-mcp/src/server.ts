@@ -31,12 +31,14 @@ if (!accountId || !delegateKeyHex) {
   process.exit(1);
 }
 
-const brain = new WalrusEternalBrain({
+let currentProjectId = process.env.BRAIN_PROJECT_ID || "mcp-session";
+let brain = new WalrusEternalBrain({
   delegateKeyHex,
   accountId,
   serverUrl,
-  currentProjectId: process.env.BRAIN_PROJECT_ID || "mcp-session",
+  currentProjectId,
 });
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 const server = new McpServer({ name: "brain-mcp", version: "1.0.0" });
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
@@ -100,6 +102,48 @@ server.tool(
     const g = await brain.fetchLibraryNeurons();
     const list = g.nodes.map((n: any) => `• ${n.label} v${n.version} [${(n.tags || []).join(", ")}]`).join("\n");
     return text(`${g.nodes.length} neurons · ${g.links.length} synapses\n${list}`);
+  },
+);
+
+// ── start project: THE anti-resolve-from-scratch tool ────────────────
+server.tool(
+  "brain_start_project",
+  "Call this FIRST when starting a new project. Opens a fresh Thinking Brain namespace for it and consults the Eternal Library for books, gotchas and playbooks from past projects that hit similar problems — so you never re-solve from scratch.",
+  {
+    name: z.string().describe("Short project name (becomes the Thinking Brain namespace)"),
+    description: z.string().describe("What the project is about / the problems you expect"),
+  },
+  async ({ name, description }) => {
+    currentProjectId = slug(name);
+    brain = new WalrusEternalBrain({ delegateKeyHex, accountId, serverUrl, currentProjectId });
+    const briefing = await brain.consultLibrary(`${name} ${description}`);
+    return text([
+      `🚀 Project "${name}" started — Thinking Brain namespace: eternal:project:${currentProjectId}`,
+      ``,
+      `KICKOFF BRIEFING (lessons from past projects — read before coding):`,
+      briefing,
+    ].join("\n"));
+  },
+);
+
+// ── shelve project: closes the loop (finished project → book) ────────
+server.tool(
+  "brain_shelve_project",
+  "Call this when a project is DONE. Consolidates the session's working memory into the Eternal Library and shelves the project as a book (with lessons), so the next project can consult it. Closes the learn-loop.",
+  {
+    summary: z.string().describe("What was built + key lessons/gotchas worth reusing"),
+    tags: z.string().optional().describe("Comma-separated keywords that should wake this book later"),
+  },
+  async ({ summary, tags }) => {
+    const consolidated = await brain.consolidateAndCleanSession();
+    const tagList = ["project-book", currentProjectId, ...(tags || "").split(",").map((s) => s.trim()).filter(Boolean)];
+    const bookId = await brain.createBook(
+      `Project: ${currentProjectId}`,
+      `${summary}\n\n[shelved by ${sourceModel} on ${new Date().toISOString().slice(0, 10)}]`,
+      tagList,
+      "complete",
+    );
+    return text(`📚 Shelved as ${bookId} (tags: ${tagList.join(", ")}).\n${consolidated}`);
   },
 );
 

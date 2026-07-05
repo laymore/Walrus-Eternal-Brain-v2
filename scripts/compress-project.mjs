@@ -79,7 +79,31 @@ function distilMd(file) {
   return out.slice(0, 40).join("\n");
 }
 
-function buildBook() {
+// Mine the REAL gold: lessons learned from the episodic record — the "problem
+// X was solved with Y" knowledge a future project actually needs (a README
+// outline alone is boilerplate, not experience).
+async function fetchLessons() {
+  const acc = process.env.VITE_MEMWAL_ACCOUNT_ID, key = process.env.VITE_MEMWAL_DELEGATE_KEY;
+  if (!acc || !key) return [];
+  try {
+    const epi = MemWal.create({ key, accountId: acc, serverUrl: LIBRARY_SERVER, namespace: "NS_BRAIN_episodic" });
+    const res = await epi.recall({ query: "lessons learned fixes outcomes gotchas", limit: 40, maxDistance: 0.95 });
+    const out = [];
+    for (const r of res.results) {
+      try {
+        const e = JSON.parse(r.text);
+        if (e.lessons) out.push(`- ${e.lessons}${e.outcome ? ` (outcome: ${e.outcome})` : ""}`);
+      } catch { /* skip non-json */ }
+    }
+    return [...new Set(out)];
+  } catch (e) {
+    console.error("   ⚠ lessons fetch failed:", e.message || e);
+    return [];
+  }
+}
+const LIBRARY_SERVER = "https://relayer.memory.walrus.xyz";
+
+function buildBook(lessons = []) {
   const name = path.basename(TARGET);
   const { mds, tree } = walk(TARGET);
 
@@ -119,6 +143,9 @@ function buildBook() {
     `## Key Configs`,
     pkgSummary || "(none)",
     ``,
+    `## Lessons Learned (mined from the episodic record — the reusable gold)`,
+    lessons.length ? lessons.join("\n") : "(no episodic lessons found)",
+    ``,
     `## Documentation (distilled outlines)`,
     docDigest || "(none)",
   ].join("\n");
@@ -129,7 +156,9 @@ function buildBook() {
 async function main() {
   console.log(`📚 ═══ Project Compressor ═══  (${COMMIT ? "COMMIT" : "DRY-RUN"})`);
   console.log(`   Target: ${TARGET}`);
-  const { name, content, mdCount } = buildBook();
+  const lessons = await fetchLessons();
+  console.log(`   Mined ${lessons.length} lessons from the episodic record.`);
+  const { name, content, mdCount } = buildBook(lessons);
   console.log(`   Distilled ${mdCount} markdown files → book (${content.length} chars).`);
 
   // Write the .md book to disk for inspection/editing.

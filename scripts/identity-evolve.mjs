@@ -202,7 +202,16 @@ async function main() {
   const base = current || { version: 0, dev_wallet: owner, project_name: "" };
   const next = { ...base, type: "BRAIN_IDENTITY", version: (base.version || 0) + 1, changed_at: NOW, prev_version: base.version || 0 };
   const changed = [];
-  for (const [k, val] of Object.entries(sets)) { next[k] = val; changed.push(k); }
+  for (const [k, val] of Object.entries(sets)) {
+    // dotted keys set nested sections, e.g. --set persona.role="..."
+    if (k.includes(".")) {
+      const [sec, sub] = k.split(".");
+      next[sec] = { ...(next[sec] || {}), [sub]: val };
+    } else {
+      next[k] = val;
+    }
+    changed.push(k);
+  }
   next.changed_fields = changed;
   // Never let a soft edit spoof the hard truth:
   next.dev_wallet = owner || base.dev_wallet;

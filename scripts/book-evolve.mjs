@@ -87,7 +87,7 @@ async function cmdList() {
   console.log(`📚 ${heads.length} neurons · ${links.length} synapse link(s)\n`);
   for (const b of heads.sort((a, z) => (a.title || "").localeCompare(z.title || ""))) {
     const syn = linkCount.get(b.book_id) || 0;
-    const st = (b.status || "complete") === "building" ? "🚧 BUILDING" : "✓ complete";
+    const st = b.status === "building" ? "🚧 BUILDING" : b.status === "sleeping" ? "😴 sleeping" : "✓ complete";
     console.log(`   🧠 ${b.title}  v${b.version || 1}  ${st}  [${(b.tags || []).join(", ")}]  ${syn ? `🔗×${syn}` : "◦ isolated"}`);
     console.log(`      ${b.book_id}`);
   }
@@ -121,7 +121,7 @@ async function cmdNew(title, content) {
 // Toggle a book's build status → appends a new version (append-only history).
 async function cmdSetStatus(ref, status) {
   const id = toBookId(ref);
-  const s = status === "building" ? "building" : "complete";
+  const s = ["building", "sleeping", "complete"].includes(status) ? status : "complete";
   const { books } = await readAll();
   const chain = books.filter((b) => b.book_id === id);
   if (!chain.length) { console.log(`   ⚠ No book ${id}.`); return; }

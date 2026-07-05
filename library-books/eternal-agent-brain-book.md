@@ -1,25 +1,39 @@
 # 📕 Project Book: eternal-agent-brain
-> Compressed from `C:\Users\admin\Desktop\Walrus Forum\eternal-agent-brain` on 2026-07-04 by claude-opus (compress-project).
+> Compressed from `C:\Users\admin\Desktop\Walrus Forum\eternal-agent-brain` on 2026-07-05 by claude-opus (compress-project).
 > Reference digest for future projects — lessons, not code copies (exact code lives in git).
 
 ## Overview
-# React + TypeScript + Vite
-  This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-## React Compiler
-  The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](ht
-## Expanding the ESLint configuration
-  If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# brain-mcp — one brain, many models
+  An MCP server that exposes the **Walrus Eternal Brain** to any MCP-capable
+## Build
+  ```bash
+## Tools
+  | Tool | What it does |
+## Configure a client (example)
+  `stdio` transport. Point any MCP client at `dist/server.js` and pass the brain
+## Env vars
+  - `MEMWAL_ACCOUNT_ID` (or `VITE_MEMWAL_ACCOUNT_ID`) — the shared MemWal account.
 
 ## Structure
 ```
+📄 .env.example
 📁 agent-api/
   📄 crawler.ts
   📄 server.ts
 📄 AGENT.md
+📁 brain-mcp/
+  📄 package.json
+  📄 README.md
+  📁 src/
+    📄 server.ts
 📄 create-site.ptb
 📁 docs/
   📄 antigravity_architecture.md
   📄 ARCHITECTURE.md
+  📁 design/
+    📄 PHASES_SHOWCASE.md
+    📄 RESEARCH_PAPER.md
+    📄 WALRUS_SITE_UPDATE_SOP.md
   📄 eternal_brain_architecture.md
   📄 WC2026_GUIDE.md
 📄 eslint.config.js
@@ -37,7 +51,9 @@
   📄 favicon.svg
   📄 icons.svg
 📄 README.md
+📄 ROADMAP.md
 📁 scripts/
+  📄 book-evolve.mjs
   📄 compress-project.mjs
   📄 create-site.mjs
   📄 deploy-final.mjs
@@ -47,6 +63,7 @@
   📄 deploy-site.mjs
   📄 find-account.mjs
   📄 find-walrus-funcs.py
+  📄 identity-evolve.mjs
   📄 ingest-architecture.mjs
   📄 init-brain-episodic.mjs
   📄 init-brain-identity.mjs
@@ -66,7 +83,6 @@
   📄 setup-account.mjs
   📄 sync-to-walrus.mjs
   📄 test-features.mjs
-  📄 test-neuro-brain.ts
   📄 watchdog.mjs
 📁 sites-manager/
   📄 Move.toml
@@ -80,24 +96,22 @@
     📄 hero.png
     📄 react.svg
     📄 vite.svg
-  📁 components/
-    📄 BrainManager.tsx
-    📄 Sidebar.tsx
-    📁 tabs/
-    📄 ThemeSelector.tsx
-    📄 WalletIdentity.tsx
-  📄 config.ts
-  📁 contexts/
-    📄 BrainContext.tsx
-  📄 index.css
-  📁 lib/
-    📄 dappKitMock.ts
 ```
 
 ## Key Configs
 - version: 1.1.0
 - scripts: dev, build, lint, preview, deploy, api, crawl
 - deps: eternal-agent-brain-core, @mysten-incubation/memwal, @mysten/dapp-kit, @mysten/enoki, @mysten/seal, @mysten/sui, @mysten/suins, @mysten/walrus, @tanstack/react-query, @types/d3-force, cors, d3-force, dompurify, dotenv, express, lucide-react, react, react-dom, react-force-graph-2d
+
+## Lessons Learned (mined from the episodic record — the reusable gold)
+- Mỗi remember() mất ~20-30 giây (gửi lên Walrus + Sui transaction). 7 entries mất ~3 phút tổng cộng. (outcome: success)
+- Nếu lấy nhầm ví dev của dự án khác → NGUY HIỂM. User đặc biệt nhấn mạnh phải cẩn thận. Ghi chú ví dev trong AGENT.md. (outcome: success)
+- User yêu cầu rõ ràng: ví không được đặt tên custom, chỉ hiển thị SuiNS hoặc địa chỉ rút gọn. Đây là quy tắc bất biến. (outcome: success)
+- Site Object ID không đổi khi update → SuiNS chỉ cần gắn 1 lần. Chỉ cần gắn lại nếu publish site mới (ID mới). (outcome: success)
+- User muốn nút hiển thị chữ 'Theme' cố định, không hiển thị tên theme hiện tại. Team Autobots → đổi tên thành 'Robot' trong menu. (outcome: success)
+- Bộ nhận diện được lấy từ file autobots_brand_identity.md của phiên trước (conversation c49ccd14). Suirobo là dự án KHÁC, không liên quan. (outcome: success)
+- Cần setup proxy CORS cho Walrus relayer khi deploy production. Dùng Cloudflare Worker làm proxy. (outcome: success)
+- QUAN TRỌNG: Không nhầm lẫn giữa các dự án. Suirobo ≠ Mini Forum. Luôn xác nhận tên dự án đúng. (outcome: success)
 
 ## Documentation (distilled outlines)
 ### AGENT.md
@@ -167,6 +181,68 @@
   1. **User dùng forum** → ký message bằng wallet → post lên Walrus Memory → người khác recall được ngay
 ## Tóm lại
   - **Chỉ cần Walrus Memory + delegate key** là forum sống
+
+### docs\design\PHASES_SHOWCASE.md
+# Eternal Agent Brain: Phases Application Showcase
+  This document provides a practical preview of each completed development phase. It explains where the features are applied in the Web UI and
+## Phase 1: Identity Core ("Who Am I")
+  - **Authentication Gate:** The `App.tsx` layout completely locks the Dashboard, Memory Explorer, and Terminal until a Web3 wallet is connect
+### 1. Web UI Application
+  - **Authentication Gate:** The `App.tsx` layout completely locks the Dashboard, Memory Explorer, and Terminal until a Web3 wallet is connect
+### 2. Cognitive Architecture Application
+  - **Spoofing Prevention:** The brain strictly binds itself to the connected wallet. It knows exactly who it belongs to, preventing unauthori
+## Phase 2: Episodic Memory ("What Happened")
+  - **Auto-Log Engine (Stimulus Terminal):** A **"Commit Memory"** button allows the user or agent to encapsulate a chat session and log it di
+### 1. Web UI Application
+  - **Auto-Log Engine (Stimulus Terminal):** A **"Commit Memory"** button allows the user or agent to encapsulate a chat session and log it di
+### 2. Cognitive Architecture Application
+  - **Sense of Time & History:** The agent transcends a stateless existence. It doesn't just know facts; it remembers *when*, *how*, and *from
+
+### docs\design\RESEARCH_PAPER.md
+# Eternal Agent Brain: A Biologically Inspired Cognitive Architecture on Walrus Memory
+  The evolution of AI agents from stateless conversational interfaces to autonomous entities requires a paradigm shift in memory architecture.
+## 1. Abstract
+  The evolution of AI agents from stateless conversational interfaces to autonomous entities requires a paradigm shift in memory architecture.
+## 2. Biological Inspiration & Core Principles
+  In the human medial temporal lobe, "Concept Cells" (or "Jennifer Aniston neurons") act as abstract memory units. They do not respond to raw 
+### 2.1. Concept Cells and Modality Invariance
+  In the human medial temporal lobe, "Concept Cells" (or "Jennifer Aniston neurons") act as abstract memory units. They do not respond to raw 
+### 2.2. Sparse Coding and Pattern Separation
+  Sparse coding is an evolutionary mechanism that optimizes memory capacity. In the dentate gyrus of the hippocampus, only a tiny fraction of 
+### 2.3. Left-Brain vs. Right-Brain Specialization
+  The agent's cognitive processing is split into two specialized hemispheres, utilizing distinct Walrus namespaces:
+## 3. The 5-Layer Cognitive Memory Hierarchy
+  To prevent memory bloat and signal dilution, the architecture is divided into five specialized tiers:
+## 4. Production-Ready Architecture & Security
+  True immutability in AI memory is not just about cryptographic hashes; it is about defending against *interpretation drift*.
+### 4.1. Hierarchical Immutability & Contamination Defense
+  True immutability in AI memory is not just about cryptographic hashes; it is about defending against *interpretation drift*.
+### 4.2. End-to-End Encryption & On-Chain Access Control
+  Walrus Memory leverages the **Seal protocol** to encrypt blobs before they leave the agent's local environment. The Walrus Relayer processes
+### 4.3. Cognitive Recovery (Self-Healing)
+  If the local vector database or relayer index is wiped, the agent's memory is not lost. By triggering the `restore` method, the system scans
+## 5. Conclusion
+  The Eternal Agent Brain architecture proves that AI agents no longer need to rely on centralized, volatile databases. By mapping biological 
+
+### docs\design\WALRUS_SITE_UPDATE_SOP.md
+# Walrus Site Update & SuiNS Linkage SOP (Standard Operating Procedure)
+  This document outlines the standard operating procedure for deploying updates to the Eternal Agent Brain web application on Walrus Sites and
+## Step 1: Build the Production Bundle
+  Ensure you are in the `eternal-agent-brain` directory and run the build command to generate the latest static assets in the `./dist` folder.
+## Step 2: Push to Walrus Sites
+  You have two options depending on whether you want to keep the existing Site Object ID or create a new one.
+### Option A: Update Existing Site (Recommended)
+  This is the fastest method because it **keeps the same Site Object ID**, meaning you **DO NOT** have to re-link your SuiNS domain!
+### Option B: Publish New Site
+  If you want to create a brand new site object on Walrus:
+## Step 3: Verify and Update SuiNS Linkage
+  *(Only required if you used Option B to publish a NEW site object)*
+### Manual Update via SuiNS dApp
+  1. **Connect to SuiNS:** Open your browser and navigate to the SuiNS dApp.
+### Automated Update via Script (Reference)
+  You can also automate this by calling the SuiNS smart contract `controller::set_user_data` directly via the `@mysten/sui` TS SDK, setting th
+## Step 4: Verification
+  Wait a few moments for the Sui network to process the transaction or the Walrus portal cache to clear.
 
 ### docs\eternal_brain_architecture.md
 # The Definitive Eternal Agent Brain Architecture
@@ -287,6 +363,36 @@
   - Terminal-native confidence: Minimalist, monospace-friendly, code-like structure.
 ## Accessibility & Inclusion
   High contrast for dark mode is strictly enforced. Ensure readability of terminal green/neon text on pure dark backgrounds. Avoid low-contras
+
+### ROADMAP.md
+# Eternal Agent Brain: Project Roadmap
+  The **Eternal Agent Brain** is a decentralized, immutable Agentic Operating System. Built on the Sui blockchain and Walrus decentralized sto
+## Overview
+  The **Eternal Agent Brain** is a decentralized, immutable Agentic Operating System. Built on the Sui blockchain and Walrus decentralized sto
+## 🧭 Architecture Decision — Two-Scope Hybrid (canonical)
+  The "2-chamber vs 5-tier" question is resolved as **two different scopes, not competing models**:
+## Phase 0: Foundation — MCP Bridge
+  *Connecting the Antigravity Brain to Walrus Memory via the MCP protocol.*
+## Phase 1: Identity Core — "Who Am I"
+  *The brain must know its identity before it can form memories.*
+## Phase 2: Episodic Memory — "What Happened"
+  *Recording specific events, timelines, actors, and outcomes.*
+## Phase 3: Semantic Memory — "What I Have Learned"
+  *Generalized knowledge extracted from specific episodes.*
+## Phase 4: Procedural Memory — "What I Know How To Do"
+  *Skills, workflows, and best practices — the "muscle memory" of the AI.*
+## Phase 5: Metacognition — "Do I Know That I Know?"
+  *The highest cognitive layer: self-assessment, self-correction, and improvement.*
+## Phase 6: Eternal Library — "The Book Shelf" (cross-project)
+  *The durable, cross-project chamber (`eternal:global:associative-core`) that holds reusable "books" — distilled knowledge any future project
+## Phase 7: Biological Simulation — "Dynamic Nervous System"
+  *Simulating the human temporal lobe and hippocampus.*
+## Phase 8: Eternal Brain Architecture — "The Immortal Brain"
+  *Transitioning from a tiered memory to a self-protecting, self-healing Eternal Architecture.*
+## Phase 9: Neuron Library & Brain-Native UI — "Each Book a Neuron"
+  *Strip the dev-oriented tabs; make the web a window into the brain itself: identity + development history, and a neuron-map of the book libr
+## Phase 10: Uniform Model Access — `brain-mcp` (FINAL — build last)
+  *The universal socket: one sovereign brain usable by ANY model-client. Deliberately the last phase — built only after the Living Brain + Ete
 
 ### walkthrough.md
 # 🧠 Hoàn tất Antigravity Brain — Kiến trúc Trí tuệ vĩnh cửu
