@@ -1,0 +1,16 @@
+{
+  "name": "eternal-agent-brain-core",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@mysten-incubation/memwal": "^0.0.7"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2"
+  }
+}

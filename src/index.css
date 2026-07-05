@@ -870,3 +870,11 @@ select.input-field { cursor: pointer; }
   html { scroll-behavior: auto; }
   body::after { display: none; }
 }
+
+/* ── Compat aliases: components use --primary/--bg-elevated; map to the real
+   themed palette so they follow theme switches (matrix green ↔ autobots cyan). */
+:root, [data-theme] {
+  --primary: var(--green);
+  --bg-elevated: var(--bg-raised);
+}
+.sidebar-item:hover { background: var(--bg-hover); }

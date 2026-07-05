@@ -1,0 +1,24 @@
+{
+  "name": "brain-mcp",
+  "version": "1.0.0",
+  "description": "MCP server exposing the Walrus Eternal Brain to any model-client (Claude Code, Antigravity, Cursor, ...).",
+  "type": "module",
+  "bin": {
+    "brain-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "eternal-agent-brain-core": "file:../packages/core",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "tsx": "^4.22.4",
+    "typescript": "~6.0.2"
+  }
+}

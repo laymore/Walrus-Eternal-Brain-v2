@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "tsc -b && vite build && site-builder update ./dist 0x19316f2a859e0d3993efce3afe2e24b820ed078fc13329671a568c6984846d53 --epochs 5",
+    "api": "tsx agent-api/server.ts",
+    "crawl": "tsx agent-api/crawler.ts"
   },
   "dependencies": {
+    "eternal-agent-brain-core": "file:packages/core",
     "@mysten-incubation/memwal": "^0.0.7",
     "@mysten/dapp-kit": "^1.0.6",
     "@mysten/enoki": "^1.0.8",
@@ -18,14 +22,22 @@
     "@mysten/suins": "^1.1.4",
     "@mysten/walrus": "^1.2.1",
     "@tanstack/react-query": "^5.101.0",
+    "@types/d3-force": "^3.0.10",
+    "cors": "^2.8.6",
+    "d3-force": "^3.0.0",
     "dompurify": "^3.4.11",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "lucide-react": "^1.17.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "react-force-graph-2d": "^1.29.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
     "@types/dompurify": "^3.0.5",
+    "@types/express": "^5.0.6",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -34,6 +46,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "tsx": "^4.22.4",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12"
