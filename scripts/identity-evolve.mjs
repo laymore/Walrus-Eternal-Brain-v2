@@ -67,9 +67,16 @@ const short = (a) => (a && a.startsWith("0x") ? `${a.slice(0, 8)}…${a.slice(-4
 
 // HARD truth: on-chain account owner = the real dev wallet.
 async function onChainOwner() {
-  const obj = await sui.getObject({ id: ACCOUNT_ID, options: { showContent: true } });
-  const f = obj?.data?.content?.fields;
-  return f?.owner || null;
+  try {
+    const obj = await sui.getObject({ id: ACCOUNT_ID, options: { showContent: true } });
+    const f = obj?.data?.content?.fields;
+    return f?.owner || null;
+  } catch (e) {
+    // RPC flakiness must not crash the whole tool — return null and let callers
+    // (drift check / --set guard) degrade gracefully.
+    console.error(`⚠️  RPC getObject failed (${e?.message || e}) — treating owner as unknown.`);
+    return null;
+  }
 }
 
 async function readVersions() {

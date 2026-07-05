@@ -11,7 +11,19 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 const app = express();
-app.use(cors());
+
+// Restrict CORS to an allow-list instead of opening the gateway to every
+// origin. Configure via API_ALLOWED_ORIGINS (comma-separated); non-browser
+// callers (no Origin header, e.g. curl / IDE tools) are always allowed.
+const ALLOWED_ORIGINS = (process.env.API_ALLOWED_ORIGINS ||
+  "http://localhost:5173,http://localhost:5174")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
+}));
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;

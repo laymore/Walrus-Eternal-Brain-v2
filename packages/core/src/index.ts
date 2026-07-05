@@ -20,6 +20,7 @@ export interface ConceptCell {
 const LIBRARY_MAX_DISTANCE = 0.55; // ~0.45 min similarity
 const SESSION_MAX_DISTANCE = 0.75; // ~0.25 min similarity
 const CONSOLIDATE_MAX_DISTANCE = 0.9; // sweep almost everything in the session
+const CONSOLIDATE_BATCH = 15;         // traces per analyze() call (avoid context overflow)
 
 // Topology graph tuning (edges via term-overlap; see fetchBrainTopology)
 const TOPO_MAX_NODES = 40;      // cap nodes for a readable graph
@@ -144,9 +145,14 @@ export class WalrusEternalBrain {
 
       // Fact extraction (Concept Cells): the relayer distills each chunk into
       // one or more atomic facts, then embeds + Seal-encrypts + stores each.
-      // We wait so the count reflects facts actually certified on Walrus.
-      const res = await this.eternalLibrary.analyzeAndWait(chunk);
-      successfullyStoredFacts += res.facts.length;
+      // Per-chunk try/catch so one bad chunk (network/relayer error) doesn't
+      // abort the whole book — the rest still gets ingested.
+      try {
+        const res = await this.eternalLibrary.analyzeAndWait(chunk);
+        successfullyStoredFacts += res.facts.length;
+      } catch (err) {
+        console.error("[ingestMarkdownBook] chunk failed, skipping:", err);
+      }
     }
     return successfullyStoredFacts;
   }
@@ -240,25 +246,36 @@ export class WalrusEternalBrain {
     // Scan the entire working memory of the current project
     const activeMemories = await this.thinkingBrain.recall({
       query: "Analyze structural findings, configuration guidelines, and critical code fixes.",
-      maxDistance: CONSOLIDATE_MAX_DISTANCE
+      maxDistance: CONSOLIDATE_MAX_DISTANCE,
+      limit: 200, // bound the sweep so a long session can't fetch unboundedly
     });
 
     if (!activeMemories || activeMemories.results.length === 0) {
       return "Không tìm thấy tri thức mới cần củng cố.";
     }
 
-    // Compile the raw working traces, then let the relayer extract the durable
-    // facts (Concept Cells) — deduped and distilled — into the Eternal Library.
-    // This is the crystallisation step; it stores distilled facts, not the blob.
-    const compiledText = activeMemories.results.map((m: any) => m.text).join("\n");
-    const res = await this.eternalLibrary.analyzeAndWait(compiledText);
+    // Let the relayer extract durable facts (Concept Cells) into the Eternal
+    // Library. BATCHED: a long session could hold hundreds of traces; joining
+    // them all into one analyze() call would overflow the extractor's context
+    // window (413 / refusal). Process in small batches and skip failed ones.
+    const texts = activeMemories.results.map((m: any) => m.text);
+    let totalFacts = 0;
+    for (let i = 0; i < texts.length; i += CONSOLIDATE_BATCH) {
+      const batch = texts.slice(i, i + CONSOLIDATE_BATCH).join("\n");
+      try {
+        const res = await this.eternalLibrary.analyzeAndWait(batch);
+        totalFacts += res.facts.length;
+      } catch (err) {
+        console.error(`[consolidate] batch ${i / CONSOLIDATE_BATCH} failed, skipping:`, err);
+      }
+    }
 
     // NOTE (#2 Active Forgetting — not yet enabled): the SDK does not expose a
     // namespace-clear primitive, so the Thinking Brain is not wiped here. Until
     // that lands, repeated consolidation is idempotent-ish because analyze()
     // dedupes facts, but working memory still accumulates. Tracked separately.
 
-    return `Đã kết tinh thành công ${res.facts.length} nơ-ron tri thức vĩnh cửu lên Walrus.`;
+    return `Đã kết tinh thành công ${totalFacts} nơ-ron tri thức vĩnh cửu lên Walrus.`;
   }
 
   /**
