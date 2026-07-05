@@ -87,9 +87,80 @@ async function readVersions() {
     .sort((a, b) => (a.version || 0) - (b.version || 0));
 }
 
+const UPGRADE_V2 = process.argv.includes("--upgrade-v2");
+
 // Stable canonical string that a signature commits to.
 function canonical(rec) {
   return ["BRAIN_IDENTITY_V", rec.version, rec.dev_wallet, rec.project_name || "", rec.changed_at || 0, JSON.stringify(rec.changed_fields || [])].join("\n");
+}
+
+// Compose the Universal Identity (V2) from the current identity + project
+// facts. Grounded in what the brain already knows; keeps legacy flat fields
+// (dev_wallet/project_name) so canonical() + older readers still work.
+function composeV2(base, owner) {
+  const brand = String(base.project_brand || "Cyberpunk, dark, terminal aesthetic");
+  return {
+    ...base,
+    type: "BRAIN_IDENTITY",
+    version: (base.version || 0) + 1,
+    prev_version: base.version || 0,
+    changed_at: NOW,
+    changed_fields: ["ownership", "persona", "runtime", "collaborators"],
+    // legacy flat fields kept for canonical/back-compat
+    dev_wallet: owner || base.dev_wallet,
+    project_name: base.project_name,
+    // ── V2 universal sections ──
+    ownership: {
+      dev_wallet: owner || base.dev_wallet,
+      project_sui_name: base.project_sui_name || "chats.sui",
+      walrus_site_object_id: base.walrus_site_object_id,
+      delegated_keys: base.delegated_keys || [],
+    },
+    persona: {
+      agent_name: base.agent_name || "Antigravity",
+      role: "Sovereign AI developer on the Walrus Eternal Brain",
+      goal: `Build and protect the ${base.project_name || "Eternal Agent Brain"} ecosystem.`,
+      lore: [
+        "Born in the Web3 era; memory lives on Walrus, identity on Sui.",
+        "Runs on a two-chamber brain (Eternal Library + Thinking Brain) over cognitive tiers.",
+        "One sovereign brain shared across many model-agents.",
+      ],
+      style: [brand, "Concise, markdown-first", "No hallucination — refuse and ask when unsure"],
+    },
+    runtime: {
+      tech_stack: ["TypeScript", "React", "Sui Move", "Walrus", "MemWal"],
+      capabilities: ["fs_read", "fs_write", "terminal_execute", "mcp_call", "recall", "remember", "consolidate"],
+      safety_constraints: [
+        "Never hardcode or commit a private key.",
+        "Use the single dev wallet for every on-chain transaction.",
+        "Confirm before destructive/irreversible operations.",
+        "Recall before acting; record a lesson after each failure.",
+      ],
+    },
+    collaborators: {
+      allowed_models: ["claude", "gpt", "gemini", "antigravity", "openclaw", "cursor"],
+      can_delegate: true,
+    },
+  };
+}
+
+async function signAndAppend(next, label) {
+  if (!SUI_PRIVATE_KEY) { console.error("   ❌ SUI_PRIVATE_KEY missing — cannot sign the change."); return; }
+  const kp = Ed25519Keypair.fromSecretKey(SUI_PRIVATE_KEY);
+  const signerAddr = kp.getPublicKey().toSuiAddress();
+  if (next.dev_wallet && signerAddr.toLowerCase() !== next.dev_wallet.toLowerCase()) {
+    console.error(`   ❌ Signer ${short(signerAddr)} is NOT the dev wallet ${short(next.dev_wallet)} — refusing (drift protection).`); return;
+  }
+  const { signature } = await kp.signPersonalMessage(new TextEncoder().encode(canonical(next)));
+  next.signature = signature; next.signed_by = signerAddr;
+  console.log(`   🔏 ${label} signed by ${short(signerAddr)}.`);
+  if (COMMIT) {
+    const job = await identityClient.remember(JSON.stringify(next));
+    await identityClient.waitForRememberJob(job.job_id);
+    console.log(`   ✅ Appended v${next.version} to NS_BRAIN_identity (history preserved).`);
+  } else {
+    console.log("   [dry-run] not written. Pass --commit to append.");
+  }
 }
 
 async function main() {
@@ -102,6 +173,14 @@ async function main() {
   if (current) {
     const drift = current.dev_wallet && owner && current.dev_wallet.toLowerCase() !== owner.toLowerCase();
     console.log(`   Latest identity v${current.version} dev_wallet ${short(current.dev_wallet)} — ${drift ? "⚠ DRIFT vs chain!" : "✓ matches chain"}`);
+  }
+
+  if (UPGRADE_V2) {
+    const base = current || { version: 0, dev_wallet: owner };
+    const next = composeV2(base, owner);
+    console.log(`\n🌐 Upgrading → Universal Identity V2 (v${next.version}): ownership + persona + runtime + collaborators`);
+    await signAndAppend(next, "Universal Identity V2");
+    return;
   }
 
   if (HISTORY || (!Object.keys(sets).length)) {
@@ -129,24 +208,7 @@ async function main() {
   next.dev_wallet = owner || base.dev_wallet;
 
   console.log(`\n✏  New identity v${next.version} — changed: ${changed.join(", ")}`);
-
-  if (!SUI_PRIVATE_KEY) { console.error("   ❌ SUI_PRIVATE_KEY missing — cannot sign the change."); return; }
-  const kp = Ed25519Keypair.fromSecretKey(SUI_PRIVATE_KEY);
-  const signerAddr = kp.getPublicKey().toSuiAddress();
-  if (owner && signerAddr.toLowerCase() !== owner.toLowerCase()) {
-    console.error(`   ❌ Signer ${short(signerAddr)} is NOT the on-chain owner ${short(owner)} — refusing (drift protection).`); return;
-  }
-  const { signature } = await kp.signPersonalMessage(new TextEncoder().encode(canonical(next)));
-  next.signature = signature; next.signed_by = signerAddr;
-  console.log(`   🔏 Signed by current dev wallet ${short(signerAddr)}.`);
-
-  if (COMMIT) {
-    const job = await identityClient.remember(JSON.stringify(next));
-    await identityClient.waitForRememberJob(job.job_id);
-    console.log(`   ✅ Appended v${next.version} to NS_BRAIN_identity (old versions preserved as history).`);
-  } else {
-    console.log("   [dry-run] not written. Pass --commit to append this signed version.");
-  }
+  await signAndAppend(next, "New identity");
 }
 
 main().catch((e) => { console.error("❌ identity-evolve failed:", e); process.exit(1); });

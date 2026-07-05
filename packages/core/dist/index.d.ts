@@ -11,6 +11,43 @@ export interface ConceptCell {
     factPayload: string;
     timestamp: number;
 }
+export interface UniversalIdentity {
+    type?: string;
+    version?: number;
+    signature?: string;
+    ownership?: {
+        dev_wallet?: string;
+        project_sui_name?: string;
+        walrus_site_object_id?: string;
+        delegated_keys?: string[];
+    };
+    persona?: {
+        agent_name?: string;
+        role?: string;
+        goal?: string;
+        lore?: string[];
+        style?: string[];
+    };
+    runtime?: {
+        tech_stack?: string[];
+        capabilities?: string[];
+        safety_constraints?: string[];
+    };
+    collaborators?: {
+        allowed_models?: string[];
+        can_delegate?: boolean;
+    };
+    agent_name?: string;
+    project_name?: string;
+    dev_wallet?: string;
+    [k: string]: unknown;
+}
+export type IdentityFormat = "full" | "eliza" | "openhands" | "crewai" | "system-prompt";
+/**
+ * Project the universal identity into a framework-native shape. Reads V2
+ * sections, falling back to legacy flat fields, so v1/v2/V2 identities all work.
+ */
+export declare function projectIdentity(id: UniversalIdentity, format?: IdentityFormat): unknown;
 export declare class WalrusEternalBrain {
     eternalLibrary: MemWal;
     thinkingBrain: MemWal;

@@ -36,19 +36,65 @@ export function BrainView() {
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Identity card */}
-          <div style={{ border: '1px solid var(--primary)', borderRadius: '8px', padding: '1.25rem', background: 'var(--bg-elevated, rgba(0,0,0,0.25))' }}>
-            <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--primary)' }}>
-              {current.agent_name || 'Agent'} <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem', fontWeight: 400 }}>· v{current.version}</span>
-            </div>
-            <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '1rem' }}>{current.agent_description || ''}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', rowGap: '0.5rem', fontSize: '0.9rem' }}>
-              <span style={{ color: 'var(--text-dim)' }}>Project</span><span>{current.project_name || '—'}</span>
-              <span style={{ color: 'var(--text-dim)' }}>Dev wallet</span><span style={{ fontFamily: 'monospace' }}>{short(current.dev_wallet)}</span>
-              <span style={{ color: 'var(--text-dim)' }}>SuiNS</span><span>{current.project_sui_name || '—'}</span>
-              <span style={{ color: 'var(--text-dim)' }}>Site object</span><span style={{ fontFamily: 'monospace' }}>{short(current.walrus_site_object_id)}</span>
-            </div>
-          </div>
+          {/* Identity card (reads V2 sections, falls back to flat v1/v2) */}
+          {(() => {
+            const persona = current.persona || {};
+            const ownership = current.ownership || {};
+            const runtime = current.runtime || {};
+            const collab = current.collaborators || {};
+            const isV2 = !!(current.persona || current.runtime);
+            const chip = (t: string) => (
+              <span key={t} style={{ fontSize: '0.75rem', padding: '2px 8px', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text-dim)' }}>{t}</span>
+            );
+            const Section = ({ title, items }: { title: string; items: string[] }) => (
+              items.length ? (
+                <div>
+                  <div style={{ color: 'var(--primary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>{title}</div>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.85rem', lineHeight: 1.6 }}>
+                    {items.map((x, i) => <li key={i}>{x}</li>)}
+                  </ul>
+                </div>
+              ) : null
+            );
+            return (
+              <>
+                <div style={{ border: '1px solid var(--primary)', borderRadius: '8px', padding: '1.25rem', background: 'var(--bg-elevated, rgba(0,0,0,0.25))' }}>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--primary)' }}>
+                    {persona.agent_name || current.agent_name || 'Agent'} <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem', fontWeight: 400 }}>· v{current.version}{isV2 ? ' · Universal' : ''}</span>
+                  </div>
+                  <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '1rem' }}>{persona.role || current.agent_description || ''}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', rowGap: '0.5rem', fontSize: '0.9rem' }}>
+                    <span style={{ color: 'var(--text-dim)' }}>Project</span><span>{current.project_name || '—'}</span>
+                    {persona.goal ? <><span style={{ color: 'var(--text-dim)' }}>Goal</span><span>{persona.goal}</span></> : null}
+                    <span style={{ color: 'var(--text-dim)' }}>Dev wallet</span><span style={{ fontFamily: 'monospace' }}>{short(ownership.dev_wallet || current.dev_wallet)}</span>
+                    <span style={{ color: 'var(--text-dim)' }}>SuiNS</span><span>{ownership.project_sui_name || current.project_sui_name || '—'}</span>
+                    <span style={{ color: 'var(--text-dim)' }}>Site object</span><span style={{ fontFamily: 'monospace' }}>{short(ownership.walrus_site_object_id || current.walrus_site_object_id)}</span>
+                  </div>
+                </div>
+
+                {isV2 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid var(--border)', borderRadius: '8px', padding: '1.25rem' }}>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-dim)' }}>🌐 Universal Identity — any model reads its soul in its own format.</div>
+                    <Section title="Persona · Lore" items={persona.lore || []} />
+                    <Section title="Persona · Style" items={persona.style || []} />
+                    <Section title="Runtime · Safety constraints" items={runtime.safety_constraints || []} />
+                    {(runtime.tech_stack || []).length ? (
+                      <div>
+                        <div style={{ color: 'var(--primary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>Runtime · Tech / Capabilities</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>{[...(runtime.tech_stack || []), ...(runtime.capabilities || [])].map(chip)}</div>
+                      </div>
+                    ) : null}
+                    {(collab.allowed_models || []).length ? (
+                      <div>
+                        <div style={{ color: 'var(--primary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>Collaborators · Allowed models</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>{(collab.allowed_models || []).map(chip)}</div>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* Development history timeline */}
           <div>

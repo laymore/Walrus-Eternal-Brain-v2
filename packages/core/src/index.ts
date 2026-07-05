@@ -14,6 +14,86 @@ export interface ConceptCell {
   timestamp: number;
 }
 
+// ─────────────────────────────────────────────────────────────────────
+//  Universal Agent Identity (V2) — one soul, many frameworks.
+//  A superset that any framework (ElizaOS, OpenHands/Claw, CrewAI, AutoGPT)
+//  can project into its own shape, so every model that plugs into the shared
+//  brain recognizes the SAME entity in the format it natively understands.
+// ─────────────────────────────────────────────────────────────────────
+export interface UniversalIdentity {
+  type?: string;               // "BRAIN_IDENTITY"
+  version?: number;
+  signature?: string;
+  ownership?: {
+    dev_wallet?: string;
+    project_sui_name?: string;
+    walrus_site_object_id?: string;
+    delegated_keys?: string[];
+  };
+  persona?: {                  // from ElizaOS / CrewAI
+    agent_name?: string;
+    role?: string;
+    goal?: string;
+    lore?: string[];
+    style?: string[];
+  };
+  runtime?: {                  // from OpenHands / Claw
+    tech_stack?: string[];
+    capabilities?: string[];
+    safety_constraints?: string[];
+  };
+  collaborators?: {            // from AutoGPT
+    allowed_models?: string[];
+    can_delegate?: boolean;
+  };
+  // legacy flat fields (v1) are still read as a fallback
+  agent_name?: string;
+  project_name?: string;
+  dev_wallet?: string;
+  [k: string]: unknown;
+}
+
+export type IdentityFormat = "full" | "eliza" | "openhands" | "crewai" | "system-prompt";
+
+/**
+ * Project the universal identity into a framework-native shape. Reads V2
+ * sections, falling back to legacy flat fields, so v1/v2/V2 identities all work.
+ */
+export function projectIdentity(id: UniversalIdentity, format: IdentityFormat = "full"): unknown {
+  const persona = id.persona || {};
+  const runtime = id.runtime || {};
+  const ownership = id.ownership || {};
+  const name = persona.agent_name || id.agent_name || "Agent";
+  const role = persona.role || "";
+  const goal = persona.goal || "";
+  const lore = persona.lore || [];
+  const style = persona.style || [];
+  const tech = runtime.tech_stack || [];
+  const caps = runtime.capabilities || [];
+  const constraints = runtime.safety_constraints || [];
+
+  switch (format) {
+    case "eliza": // Bio / Lore / Style / Adjectives / Topics
+      return { name, bio: [role, goal].filter(Boolean), lore, adjectives: style, topics: tech, style: { all: style, chat: style, post: style } };
+    case "openhands": // Runtime / Capabilities / Constraints
+      return { agent: name, runtime: { tech_stack: tech }, allowed_capabilities: caps, safety_constraints: constraints };
+    case "crewai": // Role / Goal / Backstory
+      return { role: role || name, goal, backstory: lore.join(" "), tools: caps };
+    case "system-prompt": // a ready-to-use behavioural directive for any LLM
+      return [
+        `You are ${name}${role ? `, ${role}` : ""}.`,
+        goal ? `Your goal: ${goal}.` : "",
+        lore.length ? `Background: ${lore.join("; ")}.` : "",
+        style.length ? `Style: ${style.join(", ")}.` : "",
+        tech.length ? `Tech stack: ${tech.join(", ")}.` : "",
+        constraints.length ? `Hard rules:\n${constraints.map((c) => "- " + c).join("\n")}` : "",
+        ownership.dev_wallet ? `Sovereign dev wallet: ${ownership.dev_wallet}.` : "",
+      ].filter(Boolean).join("\n");
+    default: // full universal object
+      return id;
+  }
+}
+
 // Recall filters. `maxDistance` = 1 - similarity. Lower = stricter (fewer, more
 // relevant hits). The Eternal Library is the verified cortex → strict; the
 // Thinking Brain is active context → looser to trigger broad association.

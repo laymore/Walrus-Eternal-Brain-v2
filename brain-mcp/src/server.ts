@@ -18,7 +18,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { WalrusEternalBrain } from "eternal-agent-brain-core";
+import { WalrusEternalBrain, projectIdentity } from "eternal-agent-brain-core";
 
 const accountId = process.env.MEMWAL_ACCOUNT_ID || process.env.VITE_MEMWAL_ACCOUNT_ID;
 const delegateKeyHex = process.env.MEMWAL_DELEGATE_KEY || process.env.VITE_MEMWAL_DELEGATE_KEY;
@@ -79,16 +79,15 @@ server.tool(
 // ── identity: who the brain is ───────────────────────────────────────
 server.tool(
   "brain_identity",
-  "Who this brain is: current identity (agent, project, dev wallet) and how many development-history versions exist.",
-  {},
-  async () => {
+  "Who this brain is — the Universal Identity. Pass `format` to get it in YOUR framework's shape so any model recognizes the same soul: 'system-prompt' (ready-to-use behavioural directive — recommended), 'eliza' (bio/lore/style), 'openhands' (runtime/capabilities/constraints), 'crewai' (role/goal/backstory), or 'full' (raw universal object).",
+  { format: z.enum(["system-prompt", "eliza", "openhands", "crewai", "full"]).optional() },
+  async ({ format }) => {
     const h = await brain.fetchIdentityHistory();
     const cur = h[h.length - 1];
     if (!cur) return text("No identity recorded.");
-    return text(JSON.stringify({
-      agent: cur.agent_name, project: cur.project_name,
-      dev_wallet: cur.dev_wallet, version: cur.version, total_versions: h.length,
-    }, null, 2));
+    const projected = projectIdentity(cur, format ?? "system-prompt");
+    const body = typeof projected === "string" ? projected : JSON.stringify(projected, null, 2);
+    return text(`# Identity v${cur.version} (of ${h.length})\n\n${body}`);
   },
 );
 
