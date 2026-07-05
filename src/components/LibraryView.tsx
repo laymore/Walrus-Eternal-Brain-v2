@@ -26,12 +26,21 @@ export function LibraryView() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ width: 800, height: 520 });
 
+  // Manual refresh (used after adding a book) — safe to sync-set outside an effect.
   const load = () => {
     if (!brain) return;
     setLoading(true);
     brain.fetchLibraryNeurons().then(setGraph).catch(() => setGraph({ nodes: [], links: [] })).finally(() => setLoading(false));
   };
-  useEffect(load, [brain]);
+
+  useEffect(() => {
+    if (!brain) return;
+    let alive = true;
+    brain.fetchLibraryNeurons()
+      .then((g) => { if (alive) { setGraph(g); setLoading(false); } })
+      .catch(() => { if (alive) { setGraph({ nodes: [], links: [] }); setLoading(false); } });
+    return () => { alive = false; };
+  }, [brain]);
 
   useEffect(() => {
     const on = () => { if (wrapRef.current) setDims({ width: wrapRef.current.clientWidth, height: wrapRef.current.clientHeight }); };

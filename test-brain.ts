@@ -4,7 +4,7 @@ import { decodeSuiPrivateKey } from "@mysten/sui/cryptography";
 import { requestSuiFromFaucetV0, getFaucetHost } from "@mysten/sui/faucet";
 import { createAccount, addDelegateKey, generateDelegateKey } from "@mysten-incubation/memwal/account";
 import { PACKAGE_ID, REGISTRY_ID, SERVER_URL } from "./src/config.ts";
-import { WalrusEternalBrain } from "./src/lib/WalrusEternalBrain.ts";
+import { WalrusEternalBrain } from "eternal-agent-brain-core";
 
 async function runTest() {
   console.log("🚀 Starting Agentic Brain Engine Test...");

@@ -10,11 +10,11 @@ export function BrainView() {
 
   useEffect(() => {
     if (!brain) return;
-    setLoading(true);
+    let alive = true;
     brain.fetchIdentityHistory()
-      .then(setVersions)
-      .catch(() => setVersions([]))
-      .finally(() => setLoading(false));
+      .then((v) => { if (alive) { setVersions(v); setLoading(false); } })
+      .catch(() => { if (alive) { setVersions([]); setLoading(false); } });
+    return () => { alive = false; };
   }, [brain]);
 
   const current = versions[versions.length - 1];
