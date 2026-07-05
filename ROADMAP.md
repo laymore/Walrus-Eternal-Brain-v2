@@ -1,6 +1,8 @@
 # Eternal Agent Brain: Project Roadmap
 
 ## Overview
+> **Mission (updated, recorded as identity v4):** this project is the **Eternal Data Library for agents** — sovereign, on-chain knowledge storage & retrieval on Walrus/MemWal. The "agent brain" machinery serves the library, not the other way around. Core loop: *finish a project → it becomes a book → the next project consults the shelf instead of re-solving from scratch.* **Forgetting is a privilege**: knowledge never dies, it sleeps inside books and wakes when the right keyword calls it.
+
 The **Eternal Agent Brain** is a decentralized, immutable Agentic Operating System. Built on the Sui blockchain and Walrus decentralized storage, it explores the intersection of autonomous agents, distributed memory, and self-evolving cognitive architectures.
 
 ---
