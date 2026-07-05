@@ -7,6 +7,7 @@ import { ThemeSelector } from './components/ThemeSelector';
 import { WalletIdentity } from './components/WalletIdentity';
 import { BrainView } from './components/BrainView';
 import { LibraryView } from './components/LibraryView';
+import { LedgerView } from './components/LedgerView';
 import { BrainProvider, useBrain } from './contexts/BrainContext';
 import { BrainManager } from './components/BrainManager';
 
@@ -20,6 +21,7 @@ function AppShell() {
     switch (activeTab) {
       case 'BRAIN': return <BrainView />;
       case 'LIBRARY': return <LibraryView />;
+      case 'LEDGER': return <LedgerView />;
       default: return <BrainView />;
     }
   };
@@ -55,7 +57,7 @@ function AppShell() {
               fontFamily: theme === 'autobots' ? 'Orbitron, sans-serif' : 'inherit',
               textShadow: '0 0 10px rgba(0,212,255,0.4)',
             }}>
-              {'>'} Agentic OS
+              {'>'} Eternal Library
             </div>
             <div style={{
               fontSize: '0.8rem',
@@ -63,7 +65,7 @@ function AppShell() {
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
             }}>
-              {'>'} Powered by Eternal Brain
+              {'>'} On-chain knowledge for agents · Walrus / MemWal
             </div>
           </div>
         </div>

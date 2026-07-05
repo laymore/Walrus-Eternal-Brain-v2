@@ -64,7 +64,7 @@ export function BrainView() {
                   </div>
                   <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '1rem' }}>{persona.role || current.agent_description || ''}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', rowGap: '0.5rem', fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--text-dim)' }}>Đang building</span>
+                    <span style={{ color: 'var(--text-dim)' }}>Building now</span>
                     <span>
                       {current.project_name || '—'}
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ffaa00', border: '1px solid #ffaa00', borderRadius: '4px', padding: '1px 6px', marginLeft: '0.5rem' }}>🚧 building</span>

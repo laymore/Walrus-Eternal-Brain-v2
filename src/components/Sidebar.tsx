@@ -7,8 +7,9 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const tabs = [
-    { id: 'BRAIN', label: 'Brain', icon: '🪪' },
-    { id: 'LIBRARY', label: 'Neuron Library', icon: '🧠' },
+    { id: 'BRAIN', label: 'Librarian', icon: '🪪' },
+    { id: 'LIBRARY', label: 'Library', icon: '🧠' },
+    { id: 'LEDGER', label: 'Ledger', icon: '📋' },
   ];
 
   return (

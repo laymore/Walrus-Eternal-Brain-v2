@@ -22,6 +22,7 @@ export function LibraryView() {
   const [showAdd, setShowAdd] = useState(false);
   const [nt, setNt] = useState(''); const [nc, setNc] = useState(''); const [ntags, setNtags] = useState('');
   const [saving, setSaving] = useState(false);
+  const [health, setHealth] = useState<any | null>(null);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ width: 800, height: 520 });
@@ -39,6 +40,7 @@ export function LibraryView() {
     brain.fetchLibraryNeurons()
       .then((g) => { if (alive) { setGraph(g); setLoading(false); } })
       .catch(() => { if (alive) { setGraph({ nodes: [], links: [] }); setLoading(false); } });
+    brain.fetchBrainHealth().then((h: any) => { if (alive) setHealth(h); }).catch(() => {});
     return () => { alive = false; };
   }, [brain]);
 
@@ -65,8 +67,14 @@ export function LibraryView() {
   };
 
   const c = graphColors(theme);
-  const q = query.toLowerCase();
-  const matches = (n: any) => q && (n.label?.toLowerCase().includes(q) || (n.tags || []).some((t: string) => t.toLowerCase().includes(q)));
+  // Keyword-wake search — SAME mechanic the agent uses in consultLibrary:
+  // tokenized keywords against tags/title. A match on a sleeping book WAKES it.
+  const kws = query.toLowerCase().split(/\W+/).filter((w) => w.length > 2);
+  const matches = (n: any) => {
+    if (!kws.length) return false;
+    const hay = [String(n.label || '').toLowerCase(), ...(n.tags || []).map((t: string) => String(t).toLowerCase())];
+    return kws.some((kw) => hay.some((h) => h.includes(kw)));
+  };
 
   const linkEnds = (l: any) => [typeof l.source === 'object' ? l.source.id : l.source, typeof l.target === 'object' ? l.target.id : l.target];
   // Neighbours of the selected neuron (books whose code this one reused / vice-versa).
@@ -85,15 +93,30 @@ export function LibraryView() {
     <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
         <div>
-          <h2>🧠 Neuron Library</h2>
+          <h2>🧠 Library — Neuron Map</h2>
           <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-            {graph.nodes.length} neurons · {graph.links.length} synapse{graph.links.length !== 1 ? 's' : ''}. Dự án <b style={{ color: '#ffcc33' }}>đang building</b> hiện to &amp; sáng (🚧). Bấm 1 neuron để hiện đường liên kết (dùng chung code) — bình thường các dây này ẩn.
+            {graph.nodes.length} neurons · {graph.links.length} synapse{graph.links.length !== 1 ? 's' : ''}. The <b style={{ color: '#ffcc33' }}>building</b> project glows (🚧); <b style={{ color: '#8a8a8a' }}>sleeping</b> books dim (😴) and wake on a keyword. Click a neuron to reveal its lineage links.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <input className="input" placeholder="🔍 Search books…" value={query} onChange={e => setQuery(e.target.value)} style={{ width: '200px' }} />
           <button className="btn" onClick={() => setShowAdd(true)}>+ Add book</button>
         </div>
+      </div>
+
+      {/* Librarian dashboard — what the agent manages, at a glance */}
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+        {([
+          ['📚 books', graph.nodes.length],
+          ['🚧 building', graph.nodes.filter((n: any) => n.building).length],
+          ['😴 sleeping', graph.nodes.filter((n: any) => n.status === 'sleeping').length],
+          ['🔗 synapses', graph.links.length],
+          ...(health ? [[health.health === 'HEALTHY' ? '🩺 healthy' : '🩺 degraded', `identity ${health.identity?.pass ?? '?'}/${(health.identity?.pass ?? 0) + (health.identity?.fail ?? 0)}`]] : []),
+        ] as [string, string | number][]).map(([k, v], i) => (
+          <span key={i} style={{ fontSize: '0.75rem', border: '1px solid var(--border)', borderRadius: '4px', padding: '3px 10px', color: 'var(--text-dim)' }}>
+            <b style={{ color: 'var(--text)' }}>{String(v)}</b> {k}
+          </span>
+        ))}
       </div>
 
       <div ref={wrapRef} style={{ flex: 1, marginTop: '1rem', position: 'relative', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
@@ -118,29 +141,34 @@ export function LibraryView() {
             }}
             nodeCanvasObject={(node: any, ctx, scale) => {
               const building = node.building;
+              const sleeping = node.status === 'sleeping';
+              const woken = sleeping && matches(node); // keyword wakes the book
               const isSel = selected && node.id === selected.id;
               const isNeighbor = neighborIds.has(node.id);
-              const faded = selected && !isSel && !isNeighbor;
+              const faded = (selected && !isSel && !isNeighbor) || (sleeping && !woken && !isSel);
               const r = (4 + (node.val || 1)) * (building ? 1.4 : 1); // building = bigger
               // glow halo for the building (current) project
               if (building) {
                 ctx.beginPath(); ctx.arc(node.x, node.y, r + 6, 0, 2 * Math.PI);
                 ctx.fillStyle = 'rgba(255,200,40,0.16)'; ctx.fill();
               }
-              ctx.globalAlpha = faded ? 0.22 : 1;
+              ctx.globalAlpha = faded ? (sleeping ? 0.3 : 0.22) : 1;
               ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-              ctx.fillStyle = matches(node) ? '#ffd700'
+              ctx.fillStyle = woken ? '#ffd700'
+                : sleeping ? '#5a5a5a'          // grey while asleep
+                : matches(node) ? '#ffd700'
                 : building ? '#ffcc33'          // brighter for building
                 : isSel ? '#ffffff' : c.node;
               ctx.fill();
               if (building || isSel) { ctx.lineWidth = 1.5; ctx.strokeStyle = building ? '#ffd700' : '#ffffff'; ctx.stroke(); }
-              if (scale > 1.3 || matches(node) || building || isSel || isNeighbor) {
+              if (scale > 1.3 || matches(node) || building || isSel || isNeighbor || woken) {
                 ctx.font = `${11 / scale + (building ? 4 : 3)}px monospace`;
                 ctx.fillStyle = c.text; ctx.textAlign = 'center';
                 ctx.fillText((node.label || '').slice(0, 24), node.x, node.y + r + 8);
-                if (building) {
-                  ctx.fillStyle = '#ffaa00';
-                  ctx.fillText('🚧 chưa hoàn thành', node.x, node.y + r + 8 + 11 / scale + 5);
+                const caption = building ? '🚧 under construction' : woken ? '⏰ awakened' : sleeping ? '😴 sleeping' : '';
+                if (caption) {
+                  ctx.fillStyle = building ? '#ffaa00' : woken ? '#ffd700' : '#8a8a8a';
+                  ctx.fillText(caption, node.x, node.y + r + 8 + 11 / scale + 5);
                 }
               }
               ctx.globalAlpha = 1;
@@ -161,16 +189,20 @@ export function LibraryView() {
           </div>
           {selected.building ? (
             <div style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 700, color: '#ffaa00', border: '1px solid #ffaa00', borderRadius: '4px', padding: '2px 8px', marginBottom: '0.75rem' }}>
-              🚧 ĐANG BUILDING — chưa hoàn thành
+              🚧 UNDER CONSTRUCTION — not finished yet
+            </div>
+          ) : selected.status === 'sleeping' ? (
+            <div style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 700, color: '#8a8a8a', border: '1px solid #8a8a8a', borderRadius: '4px', padding: '2px 8px', marginBottom: '0.75rem' }}>
+              😴 SLEEPING — wakes on a keyword
             </div>
           ) : (
             <div style={{ display: 'inline-block', fontSize: '0.72rem', color: 'var(--text-dim)', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 8px', marginBottom: '0.75rem' }}>
-              ✓ hoàn thành
+              ✓ complete
             </div>
           )}
           {neighborIds.size > 0 && (
             <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>
-              🔗 Liên kết {neighborIds.size} dự án (dùng chung code) — đường tuyến đang hiện.
+              🔗 Linked to {neighborIds.size} project{neighborIds.size > 1 ? 's' : ''} (shared code) — lineage lines are showing.
             </div>
           )}
           <div style={{ fontSize: '0.85rem', lineHeight: 1.5, whiteSpace: 'pre-wrap', padding: '0.5rem', background: 'rgba(0,0,0,0.25)', borderRadius: '4px', maxHeight: '180px', overflowY: 'auto' }}>

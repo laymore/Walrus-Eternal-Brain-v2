@@ -158,6 +158,69 @@ export class WalrusEternalBrain {
         await this.eternalLibrary.waitForRememberJob(job.job_id);
         return book_id;
     }
+    /**
+     * LIBRARY LEDGER: what the librarian has been DOING — shelf events (books
+     * shelved/evolved, synapses formed) plus recent working traces with model
+     * provenance. This is the UI's proof-of-work feed.
+     */
+    async fetchLedger(limit = 30) {
+        const shelf = [];
+        const res = await this.eternalLibrary.recall({
+            query: "LIBRARY_BOOK BOOK_LINK project book link", limit: 100, maxDistance: 0.98,
+        });
+        for (const r of res.results) {
+            let j = null;
+            try {
+                j = JSON.parse(r.text);
+            }
+            catch {
+                continue;
+            }
+            if (j?.type === "LIBRARY_BOOK") {
+                shelf.push({
+                    ts: j.changed_at || j.promoted_at || 0,
+                    kind: (j.version || 1) > 1 ? "book evolved" : "book shelved",
+                    label: j.title,
+                    detail: `v${j.version || 1} · ${j.status || "complete"} · ${j.origin || "?"}${j.source_model ? ` · ${j.source_model}` : ""}`,
+                });
+            }
+            else if (j?.type === "BOOK_LINK") {
+                shelf.push({ ts: j.created_at || 0, kind: "synapse formed", label: `${j.from_book_id} → ${j.to_book_id}`, detail: j.reason || "" });
+            }
+        }
+        shelf.sort((a, b) => b.ts - a.ts);
+        // Recent working traces (thinking brain) — carry [source_model] provenance.
+        const traces = [];
+        try {
+            const th = await this.thinkingBrain.recall({ query: "trace lesson fix work step", limit: 15, maxDistance: 0.95 });
+            for (const r of th.results) {
+                const t = String(r.text || "");
+                const m = t.match(/^\[([^\]]+)\]\s*/);
+                traces.push({ model: m ? m[1] : "agent", detail: t.replace(/^\[[^\]]+\]\s*/, "").slice(0, 140) });
+            }
+        }
+        catch { /* thinking brain may be empty for a fresh project */ }
+        return { shelf: shelf.slice(0, limit), traces };
+    }
+    /** Latest ETERNAL_HEALTH snapshot (Phase 8) from NS_BRAIN_meta, or null. */
+    async fetchBrainHealth() {
+        try {
+            const res = await this.clientFor("NS_BRAIN_meta").recall({ query: "ETERNAL_HEALTH brain health identity ttl", limit: 10, maxDistance: 0.95 });
+            const snaps = res.results
+                .map((r) => { try {
+                return JSON.parse(r.text);
+            }
+            catch {
+                return null;
+            } })
+                .filter((x) => x?.subtype === "ETERNAL_HEALTH")
+                .sort((a, b) => (a.generated_at || 0) - (b.generated_at || 0));
+            return snaps[snaps.length - 1] || null;
+        }
+        catch {
+            return null;
+        }
+    }
     /** BOOK DETAIL: every version of one book_id, oldest → newest. */
     async fetchBookHistory(bookId) {
         const res = await this.eternalLibrary.recall({ query: bookId, limit: 40, maxDistance: 0.98 });
@@ -217,11 +280,11 @@ export class WalrusEternalBrain {
         });
         const contextBuffer = [];
         if (libraryMemories.results.length > 0) {
-            contextBuffer.push("=== KINH NGHIỆM ĐÃ TÍCH LŨY TỪ CÁC DỰ ÁN TRƯỚC (WALRUS ETERNAL LIBRARY) ===");
-            libraryMemories.results.forEach((m) => contextBuffer.push(`* [Đã kiểm chứng]: ${m.text}`));
+            contextBuffer.push("=== ACCUMULATED EXPERIENCE FROM PAST PROJECTS (WALRUS ETERNAL LIBRARY) ===");
+            libraryMemories.results.forEach((m) => contextBuffer.push(`* [Verified]: ${m.text}`));
         }
         if (sessionMemories.results.length > 0) {
-            contextBuffer.push("=== BỐI CẢNH DỰ ÁN HIỆN TẠI (ACTIVE THINKING BRAIN) ===");
+            contextBuffer.push("=== CURRENT PROJECT CONTEXT (ACTIVE THINKING BRAIN) ===");
             sessionMemories.results.forEach((m) => contextBuffer.push(`- ${m.text}`));
         }
         return contextBuffer.join("\n");
@@ -279,9 +342,9 @@ export class WalrusEternalBrain {
         ranked.sort((a, z) => z.score - a.score);
         const top = ranked.slice(0, limit);
         if (!top.length && !plain.length) {
-            return "📚 Thư viện vĩnh cửu chưa có sách liên quan đến vấn đề này.";
+            return "📚 The Eternal Library has no relevant books for this problem yet.";
         }
-        const lines = ["=== 📚 SÁCH THAM KHẢO TỪ THƯ VIỆN VĨNH CỬU (cross-project) ==="];
+        const lines = ["=== 📚 REFERENCE BOOKS FROM THE ETERNAL LIBRARY (cross-project) ==="];
         for (const { book, score, woke } of top) {
             const prov = [book.origin].filter(Boolean).join("/");
             const badges = [
@@ -306,7 +369,7 @@ export class WalrusEternalBrain {
             limit: 200, // bound the sweep so a long session can't fetch unboundedly
         });
         if (!activeMemories || activeMemories.results.length === 0) {
-            return "Không tìm thấy tri thức mới cần củng cố.";
+            return "No new knowledge to consolidate.";
         }
         // Let the relayer extract durable facts (Concept Cells) into the Eternal
         // Library. BATCHED: a long session could hold hundreds of traces; joining
@@ -328,7 +391,7 @@ export class WalrusEternalBrain {
         // namespace-clear primitive, so the Thinking Brain is not wiped here. Until
         // that lands, repeated consolidation is idempotent-ish because analyze()
         // dedupes facts, but working memory still accumulates. Tracked separately.
-        return `Đã kết tinh thành công ${totalFacts} nơ-ron tri thức vĩnh cửu lên Walrus.`;
+        return `Consolidated ${totalFacts} durable knowledge neurons into the Eternal Library.`;
     }
     /**
      * COGNITIVE RECOVERY: Download and rebuild index if cache is cleared

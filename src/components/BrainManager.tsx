@@ -9,9 +9,9 @@ export function BrainManager({ children }: { children: React.ReactNode }) {
   if (!account) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '2rem', textAlign: 'center' }}>
-        <h2>🧠 Welcome to Eternal Brain</h2>
-        <p style={{ color: 'var(--text-dim)', marginBottom: '2rem', maxWidth: '400px' }}>
-          Connect your Sui wallet to access your personal decentralized agent brain. All memories are stored securely on Walrus.
+        <h2>🧠 Welcome to the Eternal Library</h2>
+        <p style={{ color: 'var(--text-dim)', marginBottom: '2rem', maxWidth: '420px' }}>
+          On-chain knowledge storage &amp; retrieval for agents. Connect your Sui wallet to browse the shelf — every finished project becomes a book so the next one never starts from scratch.
         </p>
         <ConnectButton />
       </div>

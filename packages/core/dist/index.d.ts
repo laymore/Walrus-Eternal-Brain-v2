@@ -70,6 +70,17 @@ export declare class WalrusEternalBrain {
     }>;
     /** ADD BOOK: shelve a new manual book-neuron (v1) into the Eternal Library. */
     createBook(title: string, content: string, tags?: string[], status?: "building" | "complete"): Promise<string>;
+    /**
+     * LIBRARY LEDGER: what the librarian has been DOING — shelf events (books
+     * shelved/evolved, synapses formed) plus recent working traces with model
+     * provenance. This is the UI's proof-of-work feed.
+     */
+    fetchLedger(limit?: number): Promise<{
+        shelf: any[];
+        traces: any[];
+    }>;
+    /** Latest ETERNAL_HEALTH snapshot (Phase 8) from NS_BRAIN_meta, or null. */
+    fetchBrainHealth(): Promise<any | null>;
     /** BOOK DETAIL: every version of one book_id, oldest → newest. */
     fetchBookHistory(bookId: string): Promise<any[]>;
     /**
