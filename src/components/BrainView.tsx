@@ -64,7 +64,11 @@ export function BrainView() {
                   </div>
                   <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '1rem' }}>{persona.role || current.agent_description || ''}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', rowGap: '0.5rem', fontSize: '0.9rem' }}>
-                    <span style={{ color: 'var(--text-dim)' }}>Project</span><span>{current.project_name || '—'}</span>
+                    <span style={{ color: 'var(--text-dim)' }}>Đang building</span>
+                    <span>
+                      {current.project_name || '—'}
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#ffaa00', border: '1px solid #ffaa00', borderRadius: '4px', padding: '1px 6px', marginLeft: '0.5rem' }}>🚧 building</span>
+                    </span>
                     {persona.goal ? <><span style={{ color: 'var(--text-dim)' }}>Goal</span><span>{persona.goal}</span></> : null}
                     <span style={{ color: 'var(--text-dim)' }}>Dev wallet</span><span style={{ fontFamily: 'monospace' }}>{short(ownership.dev_wallet || current.dev_wallet)}</span>
                     <span style={{ color: 'var(--text-dim)' }}>SuiNS</span><span>{ownership.project_sui_name || current.project_sui_name || '—'}</span>

@@ -179,25 +179,32 @@ export class WalrusEternalBrain {
         links.push({ source: j.from_book_id, target: j.to_book_id, reason: j.reason });
       }
     }
-    const nodes = [...latest.values()].map((b) => ({
-      id: b.book_id,
-      label: b.title,
-      version: b.version || 1,
-      tags: b.tags || [],
-      origin: b.origin,
-      content: b.content,
-      val: 1 + Math.min(3, (b.content?.length || 0) / 2000),
-    }));
+    const nodes = [...latest.values()].map((b) => {
+      const status = b.status || "complete";
+      const building = status === "building";
+      return {
+        id: b.book_id,
+        label: b.title,
+        version: b.version || 1,
+        tags: b.tags || [],
+        origin: b.origin,
+        content: b.content,
+        status,
+        building,
+        // building neurons render bigger; base size scales with content length
+        val: (building ? 4 : 1) + Math.min(3, (b.content?.length || 0) / 2000),
+      };
+    });
     const nodeIds = new Set(nodes.map((n) => n.id));
     return { nodes, links: links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target)) };
   }
 
   /** ADD BOOK: shelve a new manual book-neuron (v1) into the Eternal Library. */
-  public async createBook(title: string, content: string, tags: string[] = []): Promise<string> {
+  public async createBook(title: string, content: string, tags: string[] = [], status: "building" | "complete" = "complete"): Promise<string> {
     const book_id = `book:${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
     const book = {
       type: "LIBRARY_BOOK", book_id, version: 1, prev_version: 0,
-      title, content, tags, origin: "manual", changed_at: Date.now(),
+      title, content, tags, status, origin: "manual", changed_at: Date.now(),
     };
     const job = await this.eternalLibrary.remember(JSON.stringify(book));
     await this.eternalLibrary.waitForRememberJob(job.job_id);

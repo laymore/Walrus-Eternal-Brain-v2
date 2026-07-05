@@ -87,7 +87,8 @@ async function cmdList() {
   console.log(`📚 ${heads.length} neurons · ${links.length} synapse link(s)\n`);
   for (const b of heads.sort((a, z) => (a.title || "").localeCompare(z.title || ""))) {
     const syn = linkCount.get(b.book_id) || 0;
-    console.log(`   🧠 ${b.title}  v${b.version || 1}  [${(b.tags || []).join(", ")}]  ${syn ? `🔗×${syn}` : "◦ isolated"}`);
+    const st = (b.status || "complete") === "building" ? "🚧 BUILDING" : "✓ complete";
+    console.log(`   🧠 ${b.title}  v${b.version || 1}  ${st}  [${(b.tags || []).join(", ")}]  ${syn ? `🔗×${syn}` : "◦ isolated"}`);
     console.log(`      ${b.book_id}`);
   }
   if (links.length) { console.log("\n   Synapses:"); links.forEach((l) => console.log(`   🔗 ${l.from_book_id} → ${l.to_book_id}  (${l.reason || "?"})`)); }
@@ -111,9 +112,23 @@ async function cmdNew(title, content) {
   const { books } = await readAll();
   if (latest(books).some((b) => b.book_id === id)) { console.log(`   ⚠ Book ${id} exists — use --evolve.`); return; }
   const tags = (flag("--tags") || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const book = { type: "LIBRARY_BOOK", book_id: id, version: 1, prev_version: 0, title, content, tags, origin: "manual", changed_at: NOW };
-  console.log(`   📖 NEW neuron ${id} v1 — "${title}"`);
+  const status = flag("--status") === "building" ? "building" : "complete";
+  const book = { type: "LIBRARY_BOOK", book_id: id, version: 1, prev_version: 0, title, content, tags, status, origin: "manual", changed_at: NOW };
+  console.log(`   📖 NEW neuron ${id} v1 (${status}) — "${title}"`);
   if (COMMIT) { await put(book); console.log("   ✅ Shelved."); } else console.log("   [dry-run] pass --commit to shelve.");
+}
+
+// Toggle a book's build status → appends a new version (append-only history).
+async function cmdSetStatus(ref, status) {
+  const id = toBookId(ref);
+  const s = status === "building" ? "building" : "complete";
+  const { books } = await readAll();
+  const chain = books.filter((b) => b.book_id === id);
+  if (!chain.length) { console.log(`   ⚠ No book ${id}.`); return; }
+  const cur = chain.sort((a, z) => (a.version || 1) - (z.version || 1))[chain.length - 1];
+  const next = { ...cur, version: (cur.version || 1) + 1, prev_version: cur.version || 1, status: s, changed_at: NOW, changed_fields: ["status"] };
+  console.log(`   ${s === "building" ? "🚧" : "✓"} SET STATUS ${id} → ${s} (v${next.version})`);
+  if (COMMIT) { await put(next); console.log("   ✅ Updated."); } else console.log("   [dry-run] pass --commit.");
 }
 
 async function cmdEvolve(ref, content) {
@@ -142,6 +157,10 @@ async function main() {
   if (has("--link")) {
     const i = argv.indexOf("--link");
     return cmdLink(argv[i + 1], argv[i + 2], flag("--reason"));
+  }
+  if (has("--set-status")) {
+    const i = argv.indexOf("--set-status");
+    return cmdSetStatus(argv[i + 1], argv[i + 2]);
   }
   return cmdList();
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { useBrain } from '../contexts/BrainContext';
 import { useTheme } from '../lib/theme';
@@ -68,13 +68,26 @@ export function LibraryView() {
   const q = query.toLowerCase();
   const matches = (n: any) => q && (n.label?.toLowerCase().includes(q) || (n.tags || []).some((t: string) => t.toLowerCase().includes(q)));
 
+  const linkEnds = (l: any) => [typeof l.source === 'object' ? l.source.id : l.source, typeof l.target === 'object' ? l.target.id : l.target];
+  // Neighbours of the selected neuron (books whose code this one reused / vice-versa).
+  const neighborIds = useMemo(() => {
+    const s = new Set<string>();
+    if (!selected) return s;
+    for (const l of graph.links as any[]) {
+      const [src, tgt] = linkEnds(l);
+      if (src === selected.id) s.add(tgt);
+      if (tgt === selected.id) s.add(src);
+    }
+    return s;
+  }, [selected, graph.links]);
+
   return (
     <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
         <div>
           <h2>🧠 Neuron Library</h2>
           <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-            {graph.nodes.length} neurons · {graph.links.length} synapse{graph.links.length !== 1 ? 's' : ''}. Each book is a neuron; links are lineage (reused knowledge).
+            {graph.nodes.length} neurons · {graph.links.length} synapse{graph.links.length !== 1 ? 's' : ''}. Dự án <b style={{ color: '#ffcc33' }}>đang building</b> hiện to &amp; sáng (🚧). Bấm 1 neuron để hiện đường liên kết (dùng chung code) — bình thường các dây này ẩn.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -91,19 +104,46 @@ export function LibraryView() {
         ) : (
           <ForceGraph2D
             width={dims.width} height={dims.height} graphData={graph} backgroundColor={c.bg}
-            nodeLabel="label" nodeRelSize={5} linkWidth={1.5} linkColor={() => c.link}
-            linkDirectionalArrowLength={4} linkDirectionalArrowRelPos={1}
+            nodeLabel="label" nodeRelSize={5} linkColor={() => c.link}
+            linkWidth={0.8} linkDirectionalArrowLength={3} linkDirectionalArrowRelPos={1}
             d3AlphaDecay={0.05} d3VelocityDecay={0.25}
             onNodeClick={openNode}
+            onBackgroundClick={() => setSelected(null)}
+            // Synapse lines are HIDDEN by default; a neuron's lineage only appears
+            // when you click it.
+            linkVisibility={(l: any) => {
+              if (!selected) return false;
+              const [src, tgt] = linkEnds(l);
+              return src === selected.id || tgt === selected.id;
+            }}
             nodeCanvasObject={(node: any, ctx, scale) => {
-              const r = 4 + (node.val || 1);
-              ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-              ctx.fillStyle = matches(node) ? '#ffd700' : c.node;
-              ctx.fill();
-              if (scale > 1.3 || matches(node)) {
-                ctx.font = `${11 / scale + 3}px monospace`; ctx.fillStyle = c.text; ctx.textAlign = 'center';
-                ctx.fillText((node.label || '').slice(0, 22), node.x, node.y + r + 8);
+              const building = node.building;
+              const isSel = selected && node.id === selected.id;
+              const isNeighbor = neighborIds.has(node.id);
+              const faded = selected && !isSel && !isNeighbor;
+              const r = (4 + (node.val || 1)) * (building ? 1.4 : 1); // building = bigger
+              // glow halo for the building (current) project
+              if (building) {
+                ctx.beginPath(); ctx.arc(node.x, node.y, r + 6, 0, 2 * Math.PI);
+                ctx.fillStyle = 'rgba(255,200,40,0.16)'; ctx.fill();
               }
+              ctx.globalAlpha = faded ? 0.22 : 1;
+              ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
+              ctx.fillStyle = matches(node) ? '#ffd700'
+                : building ? '#ffcc33'          // brighter for building
+                : isSel ? '#ffffff' : c.node;
+              ctx.fill();
+              if (building || isSel) { ctx.lineWidth = 1.5; ctx.strokeStyle = building ? '#ffd700' : '#ffffff'; ctx.stroke(); }
+              if (scale > 1.3 || matches(node) || building || isSel || isNeighbor) {
+                ctx.font = `${11 / scale + (building ? 4 : 3)}px monospace`;
+                ctx.fillStyle = c.text; ctx.textAlign = 'center';
+                ctx.fillText((node.label || '').slice(0, 24), node.x, node.y + r + 8);
+                if (building) {
+                  ctx.fillStyle = '#ffaa00';
+                  ctx.fillText('🚧 chưa hoàn thành', node.x, node.y + r + 8 + 11 / scale + 5);
+                }
+              }
+              ctx.globalAlpha = 1;
             }}
           />
         )}
@@ -116,9 +156,23 @@ export function LibraryView() {
             <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '1rem' }}>📖 {selected.label}</h3>
             <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}>✕</button>
           </div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0.25rem 0 0.75rem' }}>
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0.25rem 0 0.5rem' }}>
             v{selected.version} · {(selected.tags || []).join(', ') || 'no tags'} · {selected.origin || '?'}
           </div>
+          {selected.building ? (
+            <div style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 700, color: '#ffaa00', border: '1px solid #ffaa00', borderRadius: '4px', padding: '2px 8px', marginBottom: '0.75rem' }}>
+              🚧 ĐANG BUILDING — chưa hoàn thành
+            </div>
+          ) : (
+            <div style={{ display: 'inline-block', fontSize: '0.72rem', color: 'var(--text-dim)', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 8px', marginBottom: '0.75rem' }}>
+              ✓ hoàn thành
+            </div>
+          )}
+          {neighborIds.size > 0 && (
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>
+              🔗 Liên kết {neighborIds.size} dự án (dùng chung code) — đường tuyến đang hiện.
+            </div>
+          )}
           <div style={{ fontSize: '0.85rem', lineHeight: 1.5, whiteSpace: 'pre-wrap', padding: '0.5rem', background: 'rgba(0,0,0,0.25)', borderRadius: '4px', maxHeight: '180px', overflowY: 'auto' }}>
             {selected.content || '(no content)'}
           </div>

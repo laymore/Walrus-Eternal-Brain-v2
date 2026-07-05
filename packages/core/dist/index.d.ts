@@ -69,7 +69,7 @@ export declare class WalrusEternalBrain {
         links: any[];
     }>;
     /** ADD BOOK: shelve a new manual book-neuron (v1) into the Eternal Library. */
-    createBook(title: string, content: string, tags?: string[]): Promise<string>;
+    createBook(title: string, content: string, tags?: string[], status?: "building" | "complete"): Promise<string>;
     /** BOOK DETAIL: every version of one book_id, oldest → newest. */
     fetchBookHistory(bookId: string): Promise<any[]>;
     /**
