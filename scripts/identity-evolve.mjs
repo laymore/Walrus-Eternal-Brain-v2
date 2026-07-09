@@ -62,21 +62,30 @@ for (let i = 0; i < process.argv.length; i++) {
 }
 
 const identityClient = MemWal.create({ key: DELEGATE_KEY, accountId: ACCOUNT_ID, serverUrl: SERVER_URL, namespace: "NS_BRAIN_identity" });
-const sui = new SuiJsonRpcClient({ network: "mainnet", url: getJsonRpcFullnodeUrl("mainnet") });
+const RPC_NODES = [
+  getJsonRpcFullnodeUrl("mainnet"),
+  "https://sui-mainnet.nodeinfra.com",
+  "https://fullnode.mainnet.sui.io:443"
+];
+let currentRpcIndex = 0;
+let sui = new SuiJsonRpcClient({ network: "mainnet", url: RPC_NODES[0] });
 const short = (a) => (a && a.startsWith("0x") ? `${a.slice(0, 8)}…${a.slice(-4)}` : a);
 
 // HARD truth: on-chain account owner = the real dev wallet.
 async function onChainOwner() {
-  try {
-    const obj = await sui.getObject({ id: ACCOUNT_ID, options: { showContent: true } });
-    const f = obj?.data?.content?.fields;
-    return f?.owner || null;
-  } catch (e) {
-    // RPC flakiness must not crash the whole tool — return null and let callers
-    // (drift check / --set guard) degrade gracefully.
-    console.error(`⚠️  RPC getObject failed (${e?.message || e}) — treating owner as unknown.`);
-    return null;
+  for (let i = 0; i < RPC_NODES.length; i++) {
+    try {
+      const obj = await sui.getObject({ id: ACCOUNT_ID, options: { showContent: true } });
+      const f = obj?.data?.content?.fields;
+      return f?.owner || null;
+    } catch (e) {
+      console.warn(`⚠️  RPC ${RPC_NODES[currentRpcIndex]} failed. Trying next...`);
+      currentRpcIndex = (currentRpcIndex + 1) % RPC_NODES.length;
+      sui = new SuiJsonRpcClient({ network: "mainnet", url: RPC_NODES[currentRpcIndex] });
+    }
   }
+  console.error("❌ All RPC nodes failed. Treating owner as unknown.");
+  return null;
 }
 
 async function readVersions() {

@@ -1,4 +1,5 @@
 import { MemWal } from "@mysten-incubation/memwal";
+export { GraphBuilder, GraphBlob, GraphNode, GraphEdge } from "./graph-builder.js";
 
 export interface EternalBrainConfig {
   delegateKeyHex: string;       // Agent's Ed25519 delegate key
@@ -117,6 +118,9 @@ export class WalrusEternalBrain {
   public eternalLibrary: MemWal;  // Eternal Library (Left Brain - Logic)
   public thinkingBrain: MemWal;        // Thinking Brain (Right Brain - Intuition)
   private cfg: EternalBrainConfig;
+  // MemWal.namespace is private (no public getter), so we track our own copy —
+  // needed by clearThinkingBrain() to derive the next epoch namespace.
+  private thinkingBrainNamespace: string;
 
   constructor(config: EternalBrainConfig) {
     this.cfg = config;
@@ -131,11 +135,12 @@ export class WalrusEternalBrain {
     });
 
     // Initialize Project Thinking Brain (Uses Default client to connect to AI Middleware)
+    this.thinkingBrainNamespace = `eternal:project:${projId}`;
     this.thinkingBrain = MemWal.create({
       key: config.delegateKeyHex,
       accountId: config.accountId,
       serverUrl: config.serverUrl,
-      namespace: `eternal:project:${projId}`,
+      namespace: this.thinkingBrainNamespace,
     });
   }
 
@@ -168,7 +173,7 @@ export class WalrusEternalBrain {
    */
   public async fetchLibraryNeurons(): Promise<{ nodes: any[]; links: any[] }> {
     const res = await this.eternalLibrary.recall({
-      query: "LIBRARY_BOOK book knowledge reference project neuron link",
+      query: "LIBRARY_BOOK GRAPH_BLOB book knowledge reference project neuron link",
       limit: 100,
       maxDistance: 0.98,
     });
@@ -183,20 +188,29 @@ export class WalrusEternalBrain {
         if (!cur || (j.version || 1) > (cur.version || 1)) latest.set(id, { ...j, book_id: id });
       } else if (j?.type === "BOOK_LINK" && j.from_book_id && j.to_book_id) {
         links.push({ source: j.from_book_id, target: j.to_book_id, reason: j.reason });
+      } else if (j?.type === "GRAPH_BLOB") {
+        // Handle Graph Blobs
+        const id = j.projectId || "graph-unknown";
+        const cur = latest.get(id);
+        if (!cur || (j.timestamp || 0) > (cur.timestamp || 0)) {
+           latest.set(id, { ...j, id, label: `Graph: ${id}`, type: "GRAPH_BLOB" });
+        }
       }
     }
     const nodes = [...latest.values()].map((b) => {
+      const isGraph = b.type === "GRAPH_BLOB";
       const status = b.status || "complete";
       const building = status === "building";
       return {
-        id: b.book_id,
-        label: b.title,
+        id: b.id || b.book_id,
+        label: b.label || b.title,
         version: b.version || 1,
         tags: b.tags || [],
         origin: b.origin,
-        content: b.content,
+        content: b.content || (isGraph ? `Nodes: ${b.nodes?.length}, Edges: ${b.edges?.length}` : ""),
         status,
         building,
+        isGraph,
         // building neurons render bigger; base size scales with content length
         val: (building ? 4 : 1) + Math.min(3, (b.content?.length || 0) / 2000),
       };
@@ -438,12 +452,28 @@ export class WalrusEternalBrain {
       }
     }
 
-    // NOTE (#2 Active Forgetting — not yet enabled): the SDK does not expose a
-    // namespace-clear primitive, so the Thinking Brain is not wiped here. Until
-    // that lands, repeated consolidation is idempotent-ish because analyze()
-    // dedupes facts, but working memory still accumulates. Tracked separately.
+    // Active Forgetting — clears the active working memory by switching to a new epoch.
+    // The previous memories are left to natural TTL decay or garbage collection on Walrus.
+    // Tracked via separate ETERNAL_HEALTH snapshot in Phase 8.
+    await this.clearThinkingBrain();
 
     return `Consolidated ${totalFacts} durable knowledge neurons into the Eternal Library.`;
+  }
+
+  /**
+   * ACTIVE FORGETTING: Wipe current working memory by migrating to a new epoch namespace.
+   * This prevents context bloat and rate-limit issues after consolidation.
+   */
+  public async clearThinkingBrain(): Promise<void> {
+    const epochId = Date.now();
+    const ns = this.thinkingBrainNamespace.split(":epoch:")[0];
+    this.thinkingBrainNamespace = `${ns}:epoch:${epochId}`;
+    this.thinkingBrain = MemWal.create({
+      key: this.cfg.delegateKeyHex,
+      accountId: this.cfg.accountId,
+      serverUrl: this.cfg.serverUrl,
+      namespace: this.thinkingBrainNamespace,
+    });
   }
 
   /**
@@ -451,8 +481,7 @@ export class WalrusEternalBrain {
    */
   public async recoverCognitiveIndex(): Promise<void> {
     await this.eternalLibrary.restore("eternal:global:associative-core");
-    // @ts-ignore
-    await this.thinkingBrain.restore(this.thinkingBrain.namespace);
+    await this.thinkingBrain.restore(this.thinkingBrainNamespace);
   }
 
   /**

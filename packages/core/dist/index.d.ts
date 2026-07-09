@@ -1,4 +1,5 @@
 import { MemWal } from "@mysten-incubation/memwal";
+export { GraphBuilder, GraphBlob, GraphNode, GraphEdge } from "./graph-builder.js";
 export interface EternalBrainConfig {
     delegateKeyHex: string;
     accountId: string;
@@ -52,6 +53,7 @@ export declare class WalrusEternalBrain {
     eternalLibrary: MemWal;
     thinkingBrain: MemWal;
     private cfg;
+    private thinkingBrainNamespace;
     constructor(config: EternalBrainConfig);
     /** Spin up a client for any brain namespace (identity, semantic, ...). */
     clientFor(namespace: string): MemWal;
@@ -105,6 +107,11 @@ export declare class WalrusEternalBrain {
      * KNOWLEDGE CONSOLIDATION: Transform short-term memory into Eternal Library
      */
     consolidateAndCleanSession(): Promise<string>;
+    /**
+     * ACTIVE FORGETTING: Wipe current working memory by migrating to a new epoch namespace.
+     * This prevents context bloat and rate-limit issues after consolidation.
+     */
+    clearThinkingBrain(): Promise<void>;
     /**
      * COGNITIVE RECOVERY: Download and rebuild index if cache is cleared
      */

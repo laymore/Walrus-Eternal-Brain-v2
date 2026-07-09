@@ -28,13 +28,23 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
-// Initialize the Brain
-const brain = new WalrusEternalBrain({
-  delegateKeyHex: process.env.VITE_MEMWAL_DELEGATE_KEY || "",
-  accountId: process.env.VITE_MEMWAL_ACCOUNT_ID || "",
-  serverUrl: process.env.VITE_MEMWAL_SERVER_URL || "",
-  currentProjectId: "local-agentic-api"
-});
+const DEFAULT_SESSION_ID = "local-agentic-api";
+const brainCache = new Map<string, WalrusEternalBrain>();
+
+function getBrain(sessionId: string): WalrusEternalBrain {
+  if (brainCache.has(sessionId)) return brainCache.get(sessionId)!;
+  const brain = new WalrusEternalBrain({
+    delegateKeyHex: process.env.VITE_MEMWAL_DELEGATE_KEY || "",
+    accountId: process.env.VITE_MEMWAL_ACCOUNT_ID || "",
+    serverUrl: process.env.VITE_MEMWAL_SERVER_URL || "",
+    currentProjectId: sessionId
+  });
+  brainCache.set(sessionId, brain);
+  return brain;
+}
+
+// Simple Mutex Map to prevent concurrent consolidation per session
+const consolidationMutex = new Map<string, boolean>();
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', brain: 'WalrusEternalBrain Online' });
@@ -42,6 +52,8 @@ app.get('/api/health', (req, res) => {
 
 // Endpoint to retrieve context from Eternal Library
 app.get('/api/context', async (req, res) => {
+  const sessionId = (req.headers['x-session-id'] as string) || DEFAULT_SESSION_ID;
+  const brain = getBrain(sessionId);
   const query = req.query.q as string;
   if (!query) {
     return res.status(400).json({ error: "Missing query parameter 'q'" });
@@ -58,6 +70,8 @@ app.get('/api/context', async (req, res) => {
 
 // Endpoint to record execution trace to Thinking Brain
 app.post('/api/trace', async (req, res) => {
+  const sessionId = (req.headers['x-session-id'] as string) || DEFAULT_SESSION_ID;
+  const brain = getBrain(sessionId);
   const { trace } = req.body;
   if (!trace) {
     return res.status(400).json({ error: "Missing 'trace' in request body" });
@@ -74,12 +88,22 @@ app.post('/api/trace', async (req, res) => {
 
 // Endpoint to force consolidation
 app.post('/api/consolidate', async (req, res) => {
+  const sessionId = (req.headers['x-session-id'] as string) || DEFAULT_SESSION_ID;
+  const brain = getBrain(sessionId);
+  
+  if (consolidationMutex.get(sessionId)) {
+    return res.status(429).json({ error: "Consolidation is already running for this session." });
+  }
+
+  consolidationMutex.set(sessionId, true);
   try {
     const result = await brain.consolidateAndCleanSession();
     res.json({ success: true, message: result });
   } catch (err: any) {
     console.error("Error consolidating session:", err);
     res.status(500).json({ error: err.message });
+  } finally {
+    consolidationMutex.set(sessionId, false);
   }
 });
 

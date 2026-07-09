@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { useBrain } from '../contexts/BrainContext';
 import { useTheme } from '../lib/theme';
-import { useToast } from '../lib/toast';
 
 function graphColors(theme: string) {
   if (theme === 'autobots') return { bg: '#050a1f', node: '#00d4ff', link: '#ff003c', text: '#ffffff' };
@@ -13,68 +12,42 @@ function graphColors(theme: string) {
 export function LibraryView() {
   const { brain } = useBrain();
   const { theme } = useTheme();
-  const toast = useToast();
   const [graph, setGraph] = useState<{ nodes: any[]; links: any[] }>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<any | null>(null);
   const [history, setHistory] = useState<any[]>([]);
-  const [showAdd, setShowAdd] = useState(false);
-  const [nt, setNt] = useState(''); const [nc, setNc] = useState(''); const [ntags, setNtags] = useState('');
-  const [saving, setSaving] = useState(false);
   const [health, setHealth] = useState<any | null>(null);
+  const [viewMode, setViewMode] = useState<'library' | 'topology'>('library');
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ width: 800, height: 520 });
 
-  // Manual refresh (used after adding a book) — safe to sync-set outside an effect.
-  const load = () => {
-    if (!brain) return;
-    setLoading(true);
-    brain.fetchLibraryNeurons().then(setGraph).catch(() => setGraph({ nodes: [], links: [] })).finally(() => setLoading(false));
-  };
-
   useEffect(() => {
     if (!brain) return;
     let alive = true;
-    brain.fetchLibraryNeurons()
+    setLoading(true);
+    const fetcher = viewMode === 'library' ? brain.fetchLibraryNeurons() : brain.fetchBrainTopology();
+    fetcher
       .then((g) => { if (alive) { setGraph(g); setLoading(false); } })
       .catch(() => { if (alive) { setGraph({ nodes: [], links: [] }); setLoading(false); } });
     brain.fetchBrainHealth().then((h: any) => { if (alive) setHealth(h); }).catch(() => {});
     return () => { alive = false; };
-  }, [brain]);
+  }, [brain, viewMode]);
 
   useEffect(() => {
     const on = () => { if (wrapRef.current) setDims({ width: wrapRef.current.clientWidth, height: wrapRef.current.clientHeight }); };
     on(); window.addEventListener('resize', on); return () => window.removeEventListener('resize', on);
-  }, [loading]);
+  }, [loading, isFullScreen]);
 
   const openNode = (node: any) => {
     setSelected(node); setHistory([]);
     if (brain) brain.fetchBookHistory(node.id).then(setHistory).catch(() => setHistory([]));
   };
 
-  const addBook = async () => {
-    if (!brain || !nt.trim() || !nc.trim()) return toast('error', 'Title and content required');
-    setSaving(true);
-    try {
-      await brain.createBook(nt.trim(), nc.trim(), ntags.split(',').map(s => s.trim()).filter(Boolean));
-      toast('success', 'Book shelved');
-      setShowAdd(false); setNt(''); setNc(''); setNtags('');
-      load();
-    } catch (e: any) { toast('error', `Failed: ${e.message || e}`); }
-    setSaving(false);
-  };
-
   const c = graphColors(theme);
-  // Keyword-wake search — SAME mechanic the agent uses in consultLibrary:
-  // tokenized keywords against tags/title. A match on a sleeping book WAKES it.
-  const kws = query.toLowerCase().split(/\W+/).filter((w) => w.length > 2);
-  const matches = (n: any) => {
-    if (!kws.length) return false;
-    const hay = [String(n.label || '').toLowerCase(), ...(n.tags || []).map((t: string) => String(t).toLowerCase())];
-    return kws.some((kw) => hay.some((h) => h.includes(kw)));
-  };
+  // Keyword-wake search is disabled as requested, books sleep forever.
+  const matches = (_n: any) => false;
 
   const linkEnds = (l: any) => [typeof l.source === 'object' ? l.source.id : l.source, typeof l.target === 'object' ? l.target.id : l.target];
   // Neighbours of the selected neuron (books whose code this one reused / vice-versa).
@@ -90,24 +63,25 @@ export function LibraryView() {
   }, [selected, graph.links]);
 
   return (
-    <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
-        <div>
-          <h2>🧠 Library — Neuron Map</h2>
-          <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-            {graph.nodes.length} neurons · {graph.links.length} synapse{graph.links.length !== 1 ? 's' : ''}. The <b style={{ color: '#ffcc33' }}>building</b> project glows (🚧); <b style={{ color: '#8a8a8a' }}>sleeping</b> books dim (😴) and wake on a keyword. Click a neuron to reveal its lineage links.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <input className="input" placeholder="🔍 Search books…" value={query} onChange={e => setQuery(e.target.value)} style={{ width: '200px' }} />
-          <button className="btn" onClick={() => setShowAdd(true)}>+ Add book</button>
+    <div className="card" style={isFullScreen ? { position: 'fixed', inset: 0, zIndex: 9999, margin: 0, borderRadius: 0, height: '100vh', display: 'flex', flexDirection: 'column' } : { height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0 }}>🧠 {viewMode === 'library' ? 'Library — Neuron Map' : 'Brain Topology — Knowledge Graph'}</h2>
+          <button className="btn btn--secondary" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }} onClick={() => {
+            const nextMode = viewMode === 'library' ? 'topology' : 'library';
+            setViewMode(nextMode);
+            setIsFullScreen(nextMode === 'topology');
+          }}>
+            {viewMode === 'library' ? '🕸️ VIEW TOPOLOGY (FULLSCREEN)' : '📚 VIEW LIBRARY'}
+          </button>
         </div>
       </div>
 
       {/* Librarian dashboard — what the agent manages, at a glance */}
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
         {([
-          ['📚 books', graph.nodes.length],
+          ['📚 books', graph.nodes.filter((n: any) => !n.isGraph).length],
+          ['🕸️ graph blobs', graph.nodes.filter((n: any) => n.isGraph).length],
           ['🚧 building', graph.nodes.filter((n: any) => n.building).length],
           ['😴 sleeping', graph.nodes.filter((n: any) => n.status === 'sleeping').length],
           ['🔗 synapses', graph.links.length],
@@ -132,9 +106,9 @@ export function LibraryView() {
             d3AlphaDecay={0.05} d3VelocityDecay={0.25}
             onNodeClick={openNode}
             onBackgroundClick={() => setSelected(null)}
-            // Synapse lines are HIDDEN by default; a neuron's lineage only appears
-            // when you click it.
+            // Synapse lines are HIDDEN by default in library mode; but ALWAYS SHOWN in topology mode.
             linkVisibility={(l: any) => {
+              if (viewMode === 'topology') return true;
               if (!selected) return false;
               const [src, tgt] = linkEnds(l);
               return src === selected.id || tgt === selected.id;
@@ -155,6 +129,8 @@ export function LibraryView() {
               ctx.globalAlpha = faded ? (sleeping ? 0.3 : 0.22) : 1;
               ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
               ctx.fillStyle = woken ? '#ffd700'
+                : node.group === 1 ? '#00ff41' // Eternal Library nodes in topology
+                : node.group === 2 ? '#ff003c' // Thinking Brain nodes in topology
                 : sleeping ? '#5a5a5a'          // grey while asleep
                 : matches(node) ? '#ffd700'
                 : building ? '#ffcc33'          // brighter for building
@@ -165,9 +141,9 @@ export function LibraryView() {
                 ctx.font = `${11 / scale + (building ? 4 : 3)}px monospace`;
                 ctx.fillStyle = c.text; ctx.textAlign = 'center';
                 ctx.fillText((node.label || '').slice(0, 24), node.x, node.y + r + 8);
-                const caption = building ? '🚧 under construction' : woken ? '⏰ awakened' : sleeping ? '😴 sleeping' : '';
+                const caption = node.isGraph ? '🕸️ graph blob' : building ? '🚧 under construction' : woken ? '⏰ awakened' : sleeping ? '😴 sleeping' : '';
                 if (caption) {
-                  ctx.fillStyle = building ? '#ffaa00' : woken ? '#ffd700' : '#8a8a8a';
+                  ctx.fillStyle = node.isGraph ? '#00ff41' : building ? '#ffaa00' : woken ? '#ffd700' : '#8a8a8a';
                   ctx.fillText(caption, node.x, node.y + r + 8 + 11 / scale + 5);
                 }
               }
@@ -197,7 +173,7 @@ export function LibraryView() {
             </div>
           ) : (
             <div style={{ display: 'inline-block', fontSize: '0.72rem', color: 'var(--text-dim)', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 8px', marginBottom: '0.75rem' }}>
-              ✓ complete
+              ✓ {selected.isGraph ? 'graph blob' : 'complete'}
             </div>
           )}
           {neighborIds.size > 0 && (
@@ -223,21 +199,7 @@ export function LibraryView() {
         </div>
       )}
 
-      {/* Add book modal */}
-      {showAdd && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="card" style={{ width: '520px', maxWidth: '90vw', padding: '1.5rem' }}>
-            <h3 style={{ marginTop: 0 }}>+ Add a book (neuron)</h3>
-            <input className="input" placeholder="Title" value={nt} onChange={e => setNt(e.target.value)} style={{ width: '100%', marginBottom: '0.5rem' }} />
-            <input className="input" placeholder="Tags (comma-separated)" value={ntags} onChange={e => setNtags(e.target.value)} style={{ width: '100%', marginBottom: '0.5rem' }} />
-            <textarea className="input" placeholder="Content (the distilled knowledge / .md)" value={nc} onChange={e => setNc(e.target.value)} style={{ width: '100%', height: '160px', marginBottom: '1rem' }} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-              <button className="btn btn--secondary" onClick={() => setShowAdd(false)}>Cancel</button>
-              <button className="btn" onClick={addBook} disabled={saving}>{saving ? 'Shelving…' : 'Shelve book'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Add book modal is hidden as Librarian only monitors agent activities */}
     </div>
   );
 }
