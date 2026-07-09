@@ -15,9 +15,11 @@
  *  Usage:
  *    node scripts/book-evolve.mjs --list
  *    node scripts/book-evolve.mjs --history "<book_id|title>"
- *    node scripts/book-evolve.mjs --new "Title" --content "..." [--tags a,b] --commit
+ *    node scripts/book-evolve.mjs --new "Title" --content "..." [--tags a,b] [--tldr "..."] [--domain web3] --commit
  *    node scripts/book-evolve.mjs --evolve "<book_id|title>" --content "..." --commit
  *    node scripts/book-evolve.mjs --link "Title A" "Title B" --reason "reused X" --commit
+ *    node scripts/book-evolve.mjs --set-status "<book_id|title>" building|sleeping|complete --commit
+ *    node scripts/book-evolve.mjs --correct "<book_id|title>" --content "what was wrong + the fix" --commit
  */
 
 import { MemWal } from "@mysten-incubation/memwal";
@@ -54,15 +56,24 @@ const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g
 const toBookId = (s) => (s.startsWith("book:") ? s : `book:${slug(s)}`);
 const short = (t) => (t || "").replace(/\s+/g, " ").slice(0, 70);
 
+// Mirrors core's deriveTlDr() — kept in sync manually since this script talks
+// to the raw MemWal client, not the WalrusEternalBrain class.
+function deriveTlDr(content, maxChars = 220) {
+  const lines = String(content || "").split(/\r?\n/).map((l) => l.replace(/^#+\s*/, "").trim()).filter(Boolean).slice(0, 3);
+  const joined = lines.join(" · ");
+  return joined.length > maxChars ? joined.slice(0, maxChars - 1) + "…" : joined || "(no summary)";
+}
+
 async function readAll() {
-  const res = await library.recall({ query: "LIBRARY_BOOK book knowledge reference project neuron", limit: 80, maxDistance: 0.98 });
-  const books = [], links = [];
+  const res = await library.recall({ query: "LIBRARY_BOOK CORRECTION_BOOK book knowledge reference project neuron errata", limit: 80, maxDistance: 0.98 });
+  const books = [], links = [], corrections = [];
   for (const r of res.results) {
     let j; try { j = JSON.parse(r.text); } catch { continue; }
     if (j?.type === "LIBRARY_BOOK") books.push({ ...j, book_id: j.book_id || toBookId(j.title || "untitled") });
     else if (j?.type === "BOOK_LINK") links.push(j);
+    else if (j?.type === "CORRECTION_BOOK") corrections.push(j);
   }
-  return { books, links };
+  return { books, links, corrections };
 }
 // latest version per book_id
 function latest(books) {
@@ -80,18 +91,22 @@ async function put(obj) {
 }
 
 async function cmdList() {
-  const { books, links } = await readAll();
+  const { books, links, corrections } = await readAll();
   const heads = latest(books);
   const linkCount = new Map();
   for (const l of links) { linkCount.set(l.from_book_id, (linkCount.get(l.from_book_id) || 0) + 1); linkCount.set(l.to_book_id, (linkCount.get(l.to_book_id) || 0) + 1); }
-  console.log(`📚 ${heads.length} neurons · ${links.length} synapse link(s)\n`);
+  const errataCount = new Map();
+  for (const c of corrections) errataCount.set(c.corrects_book_id, (errataCount.get(c.corrects_book_id) || 0) + 1);
+  console.log(`📚 ${heads.length} neurons · ${links.length} synapse link(s) · ${corrections.length} errata\n`);
   for (const b of heads.sort((a, z) => (a.title || "").localeCompare(z.title || ""))) {
     const syn = linkCount.get(b.book_id) || 0;
+    const errata = errataCount.get(b.book_id) || 0;
     const st = b.status === "building" ? "🚧 BUILDING" : b.status === "sleeping" ? "😴 sleeping" : "✓ complete";
-    console.log(`   🧠 ${b.title}  v${b.version || 1}  ${st}  [${(b.tags || []).join(", ")}]  ${syn ? `🔗×${syn}` : "◦ isolated"}`);
-    console.log(`      ${b.book_id}`);
+    console.log(`   🧠 ${b.title}  v${b.version || 1}  ${st}  [${(b.tags || []).join(", ")}]  ${syn ? `🔗×${syn}` : "◦ isolated"}${errata ? `  ⚠×${errata}` : ""}${b.domain_context ? `  🌐${b.domain_context}` : ""}`);
+    console.log(`      ${b.book_id}${b.tl_dr ? ` — ${b.tl_dr}` : ""}`);
   }
   if (links.length) { console.log("\n   Synapses:"); links.forEach((l) => console.log(`   🔗 ${l.from_book_id} → ${l.to_book_id}  (${l.reason || "?"})`)); }
+  if (corrections.length) { console.log("\n   Errata:"); corrections.forEach((c) => console.log(`   ⚠ ${c.corrects_book_id}: ${short(c.content)}`)); }
 }
 
 async function cmdHistory(ref) {
@@ -113,9 +128,24 @@ async function cmdNew(title, content) {
   if (latest(books).some((b) => b.book_id === id)) { console.log(`   ⚠ Book ${id} exists — use --evolve.`); return; }
   const tags = (flag("--tags") || "").split(",").map((s) => s.trim()).filter(Boolean);
   const status = flag("--status") === "building" ? "building" : "complete";
-  const book = { type: "LIBRARY_BOOK", book_id: id, version: 1, prev_version: 0, title, content, tags, status, origin: "manual", changed_at: NOW };
-  console.log(`   📖 NEW neuron ${id} v1 (${status}) — "${title}"`);
+  const tl_dr = flag("--tldr") || deriveTlDr(content);
+  const domain_context = flag("--domain") || undefined;
+  const book = { type: "LIBRARY_BOOK", book_id: id, version: 1, prev_version: 0, title, content, tags, status, tl_dr, domain_context, origin: "manual", changed_at: NOW };
+  console.log(`   📖 NEW neuron ${id} v1 (${status}) — "${title}"${domain_context ? ` [${domain_context}]` : ""}`);
+  console.log(`      TL;DR: ${tl_dr}`);
   if (COMMIT) { await put(book); console.log("   ✅ Shelved."); } else console.log("   [dry-run] pass --commit to shelve.");
+}
+
+// Errata / Correction Books ("Garbage Vault"): Walrus is immutable, so a wrong
+// book can't be deleted. A CORRECTION_BOOK links back to it instead, and
+// consultLibrary automatically surfaces it as a "⚠ ERRATA" warning.
+async function cmdCorrect(ref, content) {
+  const id = toBookId(ref);
+  const { books } = await readAll();
+  if (!latest(books).some((b) => b.book_id === id)) { console.log(`   ⚠ No book ${id} to correct.`); return; }
+  const correction = { type: "CORRECTION_BOOK", corrects_book_id: id, content, created_at: NOW };
+  console.log(`   ⚠ CORRECTION for ${id}:\n     ${short(content)}`);
+  if (COMMIT) { await put(correction); console.log("   ✅ Errata filed — consultLibrary will surface it automatically."); } else console.log("   [dry-run] pass --commit to file.");
 }
 
 // Toggle a book's build status → appends a new version (append-only history).
@@ -162,6 +192,7 @@ async function main() {
     const i = argv.indexOf("--set-status");
     return cmdSetStatus(argv[i + 1], argv[i + 2]);
   }
+  if (has("--correct")) return cmdCorrect(flag("--correct"), flag("--content") || "(empty)");
   return cmdList();
 }
 

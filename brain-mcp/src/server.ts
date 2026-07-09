@@ -32,6 +32,7 @@ if (!accountId || !delegateKeyHex) {
 }
 
 let currentProjectId = process.env.BRAIN_PROJECT_ID || "mcp-session";
+let currentDomain: string | undefined; // set by brain_start_project; stamped onto shelved books
 let brain = new WalrusEternalBrain({
   delegateKeyHex,
   accountId,
@@ -54,9 +55,24 @@ server.tool(
 // ── consult library: cross-project reference books ───────────────────
 server.tool(
   "brain_consult_library",
-  "When stuck on a problem, pull cross-project reference 'books' (distilled reusable knowledge) from the Eternal Library.",
-  { problem: z.string().describe("The problem or topic you're stuck on") },
-  async ({ problem }) => text(await brain.consultLibrary(problem)),
+  "When stuck on a problem, pull cross-project reference 'books' (distilled reusable knowledge) from the Eternal Library. Returns short TL;DR cards, not full text — call brain_read_book(book_id) to read one in full once it looks relevant.",
+  {
+    problem: z.string().describe("The problem or topic you're stuck on"),
+    domain: z.string().optional().describe("Ecosystem/ context (e.g. 'web3', 'mobile', 'cloud') to avoid confusing same-named playbooks from a different domain"),
+  },
+  async ({ problem, domain }) => text(await brain.consultLibrary(problem, 8, { domain: domain ?? currentDomain })),
+);
+
+// ── read book: pull FULL text of one book on demand ───────────────────
+server.tool(
+  "brain_read_book",
+  "Pull the FULL text of one book by its book_id (as shown in brain_consult_library's TL;DR cards, e.g. '[book:my-title]'). Call this only after the TL;DR looks relevant — avoids blowing the context window on every book up front.",
+  { book_id: z.string().describe("The book_id from a consultLibrary TL;DR card, e.g. 'book:deploy-playbook'") },
+  async ({ book_id }) => {
+    const b = await brain.getBookContent(book_id);
+    if (!b) return text(`No book found for "${book_id}".`);
+    return text(`# ${b.title} (v${b.version})\n\n${b.content}`);
+  },
 );
 
 // ── remember: record a working trace to the Thinking Brain ───────────
@@ -112,11 +128,13 @@ server.tool(
   {
     name: z.string().describe("Short project name (becomes the Thinking Brain namespace)"),
     description: z.string().describe("What the project is about / the problems you expect"),
+    domain: z.string().optional().describe("Ecosystem/context (e.g. 'web3', 'mobile', 'cloud') — filters out same-named-but-unrelated playbooks from other ecosystems, and gets stamped onto the book this project later shelves"),
   },
-  async ({ name, description }) => {
+  async ({ name, description, domain }) => {
     currentProjectId = slug(name);
+    currentDomain = domain;
     brain = new WalrusEternalBrain({ delegateKeyHex, accountId, serverUrl, currentProjectId });
-    const briefing = await brain.consultLibrary(`${name} ${description}`);
+    const briefing = await brain.consultLibrary(`${name} ${description}`, 8, { domain });
     return text([
       `🚀 Project "${name}" started — Thinking Brain namespace: eternal:project:${currentProjectId}`,
       ``,
@@ -133,8 +151,9 @@ server.tool(
   {
     summary: z.string().describe("What was built + key lessons/gotchas worth reusing"),
     tags: z.string().optional().describe("Comma-separated keywords that should wake this book later"),
+    tl_dr: z.string().optional().describe("A 3-line summary card. If omitted, one is derived automatically from the summary."),
   },
-  async ({ summary, tags }) => {
+  async ({ summary, tags, tl_dr }) => {
     const consolidated = await brain.consolidateAndCleanSession();
     const tagList = ["project-book", currentProjectId, ...(tags || "").split(",").map((s) => s.trim()).filter(Boolean)];
     const bookId = await brain.createBook(
@@ -142,8 +161,9 @@ server.tool(
       `${summary}\n\n[shelved by ${sourceModel} on ${new Date().toISOString().slice(0, 10)}]`,
       tagList,
       "complete",
+      { tlDr: tl_dr, domainContext: currentDomain, origin: "agent", sourceModel },
     );
-    return text(`📚 Shelved as ${bookId} (tags: ${tagList.join(", ")}).\n${consolidated}`);
+    return text(`📚 Shelved as ${bookId} (tags: ${tagList.join(", ")}${currentDomain ? `, domain: ${currentDomain}` : ""}).\n${consolidated}`);
   },
 );
 

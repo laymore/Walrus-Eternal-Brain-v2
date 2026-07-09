@@ -55,13 +55,38 @@ const CUSTOM_ACTION = actionIdx >= 0 ? process.argv[actionIdx + 1] : null;
 const NOW = Date.now();
 const DAY = 24 * 60 * 60 * 1000;
 
-const DEFAULT_ACTIONS = CUSTOM_ACTION ? [CUSTOM_ACTION] : [
+// Bootstrap-only fallback (English) — used ONLY when there's no episodic
+// history yet to derive real candidate actions from.
+const BOOTSTRAP_ACTIONS = [
   "Deploy the site to Walrus Sites with site-builder",
   "Rotate or change the developer wallet",
   "Add a new UI theme to the forum",
   "Hide or moderate a forum post as admin",
   "Consolidate working memory into the eternal library",
 ];
+
+/**
+ * Language-barrier fix: instead of assessing a hardcoded ENGLISH action list
+ * against episodic/procedural/semantic memory that may be recorded in
+ * Vietnamese (or any other language), DERIVE the candidate actions from the
+ * agent's own recent episodic summaries. This keeps the query in the SAME
+ * language as what's actually stored, so recall() similarity isn't degraded
+ * by a translation mismatch — no hardcoded language assumption either way.
+ */
+async function deriveActionsFromEpisodic(n = 5) {
+  const res = await episodic.recall({ query: "recent tasks actions decisions events", limit: 20, maxDistance: 0.95 });
+  const seen = new Set();
+  const actions = [];
+  for (const r of res.results) {
+    const j = safeJson(r.text);
+    const candidate = j?.summary || j?.event_type;
+    if (!candidate || seen.has(candidate)) continue;
+    seen.add(candidate);
+    actions.push(candidate);
+    if (actions.length >= n) break;
+  }
+  return actions;
+}
 
 function brainClient(namespace) {
   return MemWal.create({ key: DELEGATE_KEY, accountId: ACCOUNT_ID, serverUrl: SERVER_URL, namespace });
@@ -83,11 +108,11 @@ const meta = brainClient("NS_BRAIN_meta");
 // ═══════════════════════════════════════════════════════════════════
 //  ENGINE 1 — PRE-ACTION ASSESSMENT
 // ═══════════════════════════════════════════════════════════════════
-async function preActionAssessment() {
+async function preActionAssessment(actions) {
   console.log("\n🔮 ENGINE 1 — Pre-Action Assessment (evidence before acting)");
   const assessments = [];
 
-  for (const action of DEFAULT_ACTIONS) {
+  for (const action of actions) {
     const [proc, sem, epi] = await Promise.all([
       recallRaw(procedural, action, 3),
       recallRaw(semantic, action, 3),
@@ -206,7 +231,19 @@ async function confidenceCalibrator() {
 // ═══════════════════════════════════════════════════════════════════
 async function main() {
   console.log(`🧠 ═══ Phase 5: Metacognition Engine ═══  (${COMMIT ? "COMMIT" : "DRY-RUN"})`);
-  await preActionAssessment();
+
+  let actions;
+  if (CUSTOM_ACTION) {
+    actions = [CUSTOM_ACTION];
+  } else {
+    const derived = await deriveActionsFromEpisodic();
+    actions = derived.length ? derived : BOOTSTRAP_ACTIONS;
+    console.log(derived.length
+      ? `\n(assessing ${derived.length} actions derived from recent episodic memory — same language as the log, no translation mismatch)`
+      : "\n(no episodic history yet — using bootstrap English actions)");
+  }
+
+  await preActionAssessment(actions);
   await postActionReflection();
   await confidenceCalibrator();
   console.log(`\n🧠 ═══ Done. ${COMMIT ? "Changes written to Walrus." : "Read-only — pass --commit to write."} ═══`);

@@ -21,6 +21,19 @@ export interface ConceptCell {
 const bookIdFromTitle = (t: unknown) =>
   `book:${String(t || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 
+// TL;DR index card (Phase 12): a 3-line summary so consultLibrary can return
+// cheap cards first — the agent only pulls full text via getBookContent() /
+// brain_read_book when the card looks relevant. Prevents context-window bloat.
+export function deriveTlDr(content: unknown, maxChars = 220): string {
+  const lines = String(content || "")
+    .split(/\r?\n/)
+    .map((l) => l.replace(/^#+\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  const joined = lines.join(" · ");
+  return joined.length > maxChars ? joined.slice(0, maxChars - 1) + "…" : joined || "(no summary)";
+}
+
 // ─────────────────────────────────────────────────────────────────────
 //  Universal Agent Identity (V2) — one soul, many frameworks.
 //  A superset that any framework (ElizaOS, OpenHands/Claw, CrewAI, AutoGPT)
@@ -169,16 +182,20 @@ export class WalrusEternalBrain {
 
   /**
    * LIBRARY VIEW: the neuron map. Each book = a neuron (latest version per
-   * book_id); each BOOK_LINK = a lineage synapse. Returns {nodes, links}.
+   * book_id); each BOOK_LINK = a lineage synapse. Returns {nodes, links,
+   * corrections}. `corrections` maps a flawed book_id → its errata entries
+   * (Phase 12 "Garbage Vault" — Walrus is immutable, so wrong books can't be
+   * deleted; a CORRECTION_BOOK links back to the original instead).
    */
-  public async fetchLibraryNeurons(): Promise<{ nodes: any[]; links: any[] }> {
+  public async fetchLibraryNeurons(): Promise<{ nodes: any[]; links: any[]; corrections: Record<string, any[]> }> {
     const res = await this.eternalLibrary.recall({
-      query: "LIBRARY_BOOK GRAPH_BLOB book knowledge reference project neuron link",
+      query: "LIBRARY_BOOK GRAPH_BLOB CORRECTION_BOOK book knowledge reference project neuron link errata",
       limit: 100,
       maxDistance: 0.98,
     });
     const latest = new Map<string, any>();
     const links: any[] = [];
+    const corrections: Record<string, any[]> = {};
     for (const r of res.results as any[]) {
       let j: any = null;
       try { j = JSON.parse(r.text); } catch { continue; }
@@ -195,6 +212,8 @@ export class WalrusEternalBrain {
         if (!cur || (j.timestamp || 0) > (cur.timestamp || 0)) {
            latest.set(id, { ...j, id, label: `Graph: ${id}`, type: "GRAPH_BLOB" });
         }
+      } else if (j?.type === "CORRECTION_BOOK" && j.corrects_book_id) {
+        (corrections[j.corrects_book_id] ||= []).push({ content: j.content, created_at: j.created_at });
       }
     }
     const nodes = [...latest.values()].map((b) => {
@@ -208,27 +227,50 @@ export class WalrusEternalBrain {
         tags: b.tags || [],
         origin: b.origin,
         content: b.content || (isGraph ? `Nodes: ${b.nodes?.length}, Edges: ${b.edges?.length}` : ""),
+        tl_dr: b.tl_dr || (isGraph ? undefined : deriveTlDr(b.content)),
+        domain_context: b.domain_context,
         status,
         building,
         isGraph,
+        hasErrata: !!corrections[b.id || b.book_id]?.length,
         // building neurons render bigger; base size scales with content length
         val: (building ? 4 : 1) + Math.min(3, (b.content?.length || 0) / 2000),
       };
     });
     const nodeIds = new Set(nodes.map((n) => n.id));
-    return { nodes, links: links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target)) };
+    return { nodes, links: links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target)), corrections };
   }
 
-  /** ADD BOOK: shelve a new manual book-neuron (v1) into the Eternal Library. */
-  public async createBook(title: string, content: string, tags: string[] = [], status: "building" | "complete" = "complete"): Promise<string> {
+  /** ADD BOOK: shelve a new book-neuron (v1) into the Eternal Library (agent-driven). */
+  public async createBook(
+    title: string, content: string, tags: string[] = [], status: "building" | "complete" = "complete",
+    opts: { tlDr?: string; domainContext?: string; origin?: string; sourceModel?: string } = {},
+  ): Promise<string> {
     const book_id = `book:${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
     const book = {
       type: "LIBRARY_BOOK", book_id, version: 1, prev_version: 0,
-      title, content, tags, status, origin: "manual", changed_at: Date.now(),
+      title, content, tags, status,
+      tl_dr: opts.tlDr || deriveTlDr(content),
+      domain_context: opts.domainContext,
+      origin: opts.origin || "manual",
+      source_model: opts.sourceModel,
+      changed_at: Date.now(),
     };
     const job = await this.eternalLibrary.remember(JSON.stringify(book));
     await this.eternalLibrary.waitForRememberJob(job.job_id);
     return book_id;
+  }
+
+  /**
+   * brain_read_book: pull the FULL text of one book on demand — the agent
+   * calls this only after the TL;DR card (from consultLibrary) looks relevant,
+   * so the context window isn't blown by every book's full content up front.
+   */
+  public async getBookContent(bookId: string): Promise<{ title: string; content: string; version: number } | null> {
+    const chain = await this.fetchBookHistory(bookId);
+    const latest = chain[chain.length - 1];
+    if (!latest) return null;
+    return { title: latest.title, content: latest.content, version: latest.version || 1 };
   }
 
   /**
@@ -360,7 +402,7 @@ export class WalrusEternalBrain {
    * "books" from the Eternal Library FIRST — accumulated wisdom that outlives
    * any single project — before touching its own session memory.
    */
-  public async consultLibrary(problem: string, limit = 8): Promise<string> {
+  public async consultLibrary(problem: string, limit = 8, opts: { domain?: string } = {}): Promise<string> {
     // TWO-TIER retrieval — the "keyword wakes the book" mechanic:
     //  Tier 1 (keyword): exact token matches on tags/title. Precise, cheap,
     //          and the ONLY thing that can wake a SLEEPING book.
@@ -391,13 +433,18 @@ export class WalrusEternalBrain {
 
     // Merge & rank: keyword hits first (they also WAKE sleeping books);
     // vector-only hits follow, but skip books that are asleep.
-    const ranked: { book: any; score: number; woke: boolean }[] = [];
+    // Contextual Provenance (Phase 12 "Tower of Babel"): when a domain is
+    // given, cross-domain books are deprioritized and flagged, not hidden —
+    // the agent still sees them but knows to double-check applicability.
+    const ranked: { book: any; score: number; woke: boolean; crossDomain: boolean }[] = [];
     for (const b of byId.values()) {
       const score = kwScore(b);
       const inVec = vecIds.has(b.id);
       const sleeping = b.status === "sleeping";
-      if (score > 0) ranked.push({ book: b, score: score + (inVec ? 0.5 : 0), woke: sleeping });
-      else if (inVec && !sleeping) ranked.push({ book: b, score: 0, woke: false });
+      const crossDomain = !!(opts.domain && b.domain_context && b.domain_context !== opts.domain);
+      const domainPenalty = crossDomain ? 0.5 : 1;
+      if (score > 0) ranked.push({ book: b, score: (score + (inVec ? 0.5 : 0)) * domainPenalty, woke: sleeping, crossDomain });
+      else if (inVec && !sleeping) ranked.push({ book: b, score: 0.01 * domainPenalty, woke: false, crossDomain });
     }
     ranked.sort((a, z) => z.score - a.score);
     const top = ranked.slice(0, limit);
@@ -406,16 +453,24 @@ export class WalrusEternalBrain {
       return "📚 The Eternal Library has no relevant books for this problem yet.";
     }
 
-    const lines: string[] = ["=== 📚 REFERENCE BOOKS FROM THE ETERNAL LIBRARY (cross-project) ==="];
-    for (const { book, score, woke } of top) {
+    // TL;DR INDEX CARDS (Phase 12 "Context Window Bloat"): return only the
+    // short summary card by default. The agent must call getBookContent(id) /
+    // brain_read_book(id) to pull full text once a card looks relevant.
+    const lines: string[] = ["=== 📚 REFERENCE BOOKS FROM THE ETERNAL LIBRARY (cross-project) — TL;DR cards; call brain_read_book(book_id) for full text ==="];
+    for (const { book, score, woke, crossDomain } of top) {
       const prov = [book.origin].filter(Boolean).join("/");
       const badges = [
         score > 0 ? `🔑 keyword×${Math.floor(score)}` : "≈ semantic",
         woke ? "😴→⏰ woke from sleep" : "",
         book.status === "building" ? "🚧 building" : "",
+        crossDomain ? `⚠ cross-domain (book is "${book.domain_context}"${opts.domain ? `, you're in "${opts.domain}"` : ""})` : "",
       ].filter(Boolean).join(" · ");
-      lines.push(`\n📖 ${book.label || book.title}  v${book.version || 1}  [${(book.tags || []).join(", ")}]  (${badges}${prov ? ` · ${prov}` : ""})`);
-      lines.push(String(book.content ?? "").trim());
+      lines.push(`\n📖 [${book.id}] ${book.label || book.title}  v${book.version || 1}  [${(book.tags || []).join(", ")}]  (${badges}${prov ? ` · ${prov}` : ""})`);
+      lines.push(`TL;DR: ${book.tl_dr || deriveTlDr(book.content)}`);
+      // Errata & Supplements ("Garbage Vault"): Walrus is immutable, so a wrong
+      // book can't be deleted — a linked CORRECTION_BOOK is surfaced instead.
+      const errata = shelf.corrections[book.id] || [];
+      for (const e of errata) lines.push(`⚠ ERRATA: ${String(e.content).trim()}`);
     }
     lines.push(...plain);
     return lines.join("\n");

@@ -12,6 +12,7 @@ export interface ConceptCell {
     factPayload: string;
     timestamp: number;
 }
+export declare function deriveTlDr(content: unknown, maxChars?: number): string;
 export interface UniversalIdentity {
     type?: string;
     version?: number;
@@ -64,14 +65,33 @@ export declare class WalrusEternalBrain {
     fetchIdentityHistory(): Promise<any[]>;
     /**
      * LIBRARY VIEW: the neuron map. Each book = a neuron (latest version per
-     * book_id); each BOOK_LINK = a lineage synapse. Returns {nodes, links}.
+     * book_id); each BOOK_LINK = a lineage synapse. Returns {nodes, links,
+     * corrections}. `corrections` maps a flawed book_id → its errata entries
+     * (Phase 12 "Garbage Vault" — Walrus is immutable, so wrong books can't be
+     * deleted; a CORRECTION_BOOK links back to the original instead).
      */
     fetchLibraryNeurons(): Promise<{
         nodes: any[];
         links: any[];
+        corrections: Record<string, any[]>;
     }>;
-    /** ADD BOOK: shelve a new manual book-neuron (v1) into the Eternal Library. */
-    createBook(title: string, content: string, tags?: string[], status?: "building" | "complete"): Promise<string>;
+    /** ADD BOOK: shelve a new book-neuron (v1) into the Eternal Library (agent-driven). */
+    createBook(title: string, content: string, tags?: string[], status?: "building" | "complete", opts?: {
+        tlDr?: string;
+        domainContext?: string;
+        origin?: string;
+        sourceModel?: string;
+    }): Promise<string>;
+    /**
+     * brain_read_book: pull the FULL text of one book on demand — the agent
+     * calls this only after the TL;DR card (from consultLibrary) looks relevant,
+     * so the context window isn't blown by every book's full content up front.
+     */
+    getBookContent(bookId: string): Promise<{
+        title: string;
+        content: string;
+        version: number;
+    } | null>;
     /**
      * LIBRARY LEDGER: what the librarian has been DOING — shelf events (books
      * shelved/evolved, synapses formed) plus recent working traces with model
@@ -102,7 +122,9 @@ export declare class WalrusEternalBrain {
      * "books" from the Eternal Library FIRST — accumulated wisdom that outlives
      * any single project — before touching its own session memory.
      */
-    consultLibrary(problem: string, limit?: number): Promise<string>;
+    consultLibrary(problem: string, limit?: number, opts?: {
+        domain?: string;
+    }): Promise<string>;
     /**
      * KNOWLEDGE CONSOLIDATION: Transform short-term memory into Eternal Library
      */
