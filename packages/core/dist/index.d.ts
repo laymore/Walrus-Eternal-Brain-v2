@@ -103,6 +103,21 @@ export declare class WalrusEternalBrain {
     }>;
     /** Latest ETERNAL_HEALTH snapshot (Phase 8) from NS_BRAIN_meta, or null. */
     fetchBrainHealth(): Promise<any | null>;
+    /**
+     * LIBRARIAN MATURITY (Phase 13-C): growth stages computed from REAL on-chain
+     * metrics — never self-declared. A rank crossing is recorded as a signed
+     * identity version (see identity-evolve --promote), so the librarian's
+     * coming-of-age story lives in the same append-only history as everything else.
+     */
+    computeMaturity(): Promise<{
+        rank: string;
+        level: number;
+        metrics: Record<string, number>;
+        next: {
+            rank: string;
+            missing: string[];
+        } | null;
+    }>;
     /** BOOK DETAIL: every version of one book_id, oldest → newest. */
     fetchBookHistory(bookId: string): Promise<any[]>;
     /**
@@ -113,6 +128,19 @@ export declare class WalrusEternalBrain {
      * INGESTION PATH 2: Record background working traces from IDEs
      */
     recordExecutionTrace(actionTrace: string): Promise<void>;
+    /**
+     * SELECTIVE INGESTION (Phase 13-B): the write-gate for working traces.
+     * Every model already has its own short-term memory — the brain persists
+     * only what is genuinely worth keeping:
+     *  - importance gate: below the threshold, the write is refused with
+     *    guidance to keep it in the model's own context.
+     *  - dedup-before-write: recall first; if a near-duplicate trace already
+     *    exists, skip the write and say so (no piling identical traces).
+     */
+    rememberSelective(trace: string, importance: number): Promise<{
+        written: boolean;
+        reason: string;
+    }>;
     /**
      * INTEGRATED RETRIEVAL: Pull context-optimized knowledge, saving API tokens
      */

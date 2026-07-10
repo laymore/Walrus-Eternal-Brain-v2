@@ -7,6 +7,7 @@ export function BrainView() {
   const { brain } = useBrain();
   const [versions, setVersions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [maturity, setMaturity] = useState<any | null>(null);
 
   useEffect(() => {
     if (!brain) return;
@@ -14,6 +15,7 @@ export function BrainView() {
     brain.fetchIdentityHistory()
       .then((v) => { if (alive) { setVersions(v); setLoading(false); } })
       .catch(() => { if (alive) { setVersions([]); setLoading(false); } });
+    brain.computeMaturity().then((m: any) => { if (alive) setMaturity(m); }).catch(() => {});
     return () => { alive = false; };
   }, [brain]);
 
@@ -59,9 +61,20 @@ export function BrainView() {
             return (
               <>
                 <div style={{ border: '1px solid var(--primary)', borderRadius: '8px', padding: '1.25rem', background: 'var(--bg-elevated, rgba(0,0,0,0.25))' }}>
-                  <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--primary)' }}>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                     {persona.agent_name || current.agent_name || 'Agent'} <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem', fontWeight: 400 }}>· v{current.version}{isV2 ? ' · Universal' : ''}</span>
+                    {maturity && (
+                      <span title={maturity.next ? `Next: ${maturity.next.rank} — missing: ${maturity.next.missing.join('; ')}` : 'Highest rank'}
+                        style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffd700', border: '1px solid #ffd700', borderRadius: '4px', padding: '2px 8px' }}>
+                        🎓 {maturity.rank} · Lv{maturity.level}
+                      </span>
+                    )}
                   </div>
+                  {maturity?.next && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', margin: '0.25rem 0 0.5rem' }}>
+                      Next stage: <b>{maturity.next.rank}</b> — missing {maturity.next.missing.join('; ')}
+                    </div>
+                  )}
                   <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '1rem' }}>{persona.role || current.agent_description || ''}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', rowGap: '0.5rem', fontSize: '0.9rem' }}>
                     <span style={{ color: 'var(--text-dim)' }}>Building now</span>

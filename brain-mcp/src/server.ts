@@ -19,6 +19,22 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { WalrusEternalBrain, projectIdentity } from "eternal-agent-brain-core";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+
+// CBM bridge (Phase 13-A): if codebase-memory-mcp has indexed this workspace,
+// its shareable graph artifact lives at .codebase-memory/graph.db.zst. We never
+// parse it — we record provenance (hash + size) in the shelved book so future
+// readers know which structural graph this wisdom was distilled from.
+function probeCbmArtifact(dir: string): { path: string; size: number; sha256: string } | null {
+  try {
+    const p = join(dir, ".codebase-memory", "graph.db.zst");
+    if (!existsSync(p)) return null;
+    const buf = readFileSync(p);
+    return { path: p, size: statSync(p).size, sha256: createHash("sha256").update(buf).digest("hex") };
+  } catch { return null; }
+}
 
 const accountId = process.env.MEMWAL_ACCOUNT_ID || process.env.VITE_MEMWAL_ACCOUNT_ID;
 const delegateKeyHex = process.env.MEMWAL_DELEGATE_KEY || process.env.VITE_MEMWAL_DELEGATE_KEY;
@@ -75,14 +91,23 @@ server.tool(
   },
 );
 
-// ── remember: record a working trace to the Thinking Brain ───────────
+// ── remember: SELECTIVE write to the Thinking Brain (Phase 13-B) ──────
+let sessionWrites = 0;
+const SESSION_WRITE_BUDGET = 20;
 server.tool(
   "brain_remember",
-  "Record a successful working trace / reasoning step / fix into the active Thinking Brain (short-term project memory).",
-  { trace: z.string().describe("The trace or lesson to remember") },
-  async ({ trace }) => {
-    await brain.recordExecutionTrace(`[${sourceModel}] ${trace}`);
-    return text("Recorded to the Thinking Brain.");
+  "Persist ONE precious, durable insight (a hard-won fix, a reusable gotcha, a decision + why). Do NOT stream routine context here — you already have short-term memory of your own. Writes below importance 3 are refused; near-duplicates are skipped; each session has a small write budget. Distill, then write.",
+  {
+    trace: z.string().describe("The distilled insight worth keeping forever-ish"),
+    importance: z.number().min(1).max(5).describe("1=routine (keep it yourself) … 5=hard-won critical knowledge. Only 3+ is persisted."),
+  },
+  async ({ trace, importance }) => {
+    if (sessionWrites >= SESSION_WRITE_BUDGET) {
+      return text(`Write budget reached (${SESSION_WRITE_BUDGET}/session). Distill your remaining traces into ONE summary and call brain_shelve_project — don't append more.`);
+    }
+    const res = await brain.rememberSelective(`[${sourceModel}] ${trace}`, importance);
+    if (res.written) sessionWrites++;
+    return text(`${res.reason}${res.written ? ` (${sessionWrites}/${SESSION_WRITE_BUDGET} session writes used)` : ""}`);
   },
 );
 
@@ -105,7 +130,13 @@ server.tool(
     if (!cur) return text("No identity recorded.");
     const projected = projectIdentity(cur, format ?? "system-prompt");
     const body = typeof projected === "string" ? projected : JSON.stringify(projected, null, 2);
-    return text(`# Identity v${cur.version} (of ${h.length})\n\n${body}`);
+    // Librarian maturity (Phase 13-C): every model feels the same growth stage.
+    let rankLine = "";
+    try {
+      const m = await brain.computeMaturity();
+      rankLine = `\n\nLibrarian rank: ${m.rank} (level ${m.level})${m.next ? ` — next: ${m.next.rank}, missing: ${m.next.missing.join("; ")}` : " — highest rank"}`;
+    } catch { /* maturity unavailable — identity still valid */ }
+    return text(`# Identity v${cur.version} (of ${h.length})\n\n${body}${rankLine}`);
   },
 );
 
@@ -152,18 +183,27 @@ server.tool(
     summary: z.string().describe("What was built + key lessons/gotchas worth reusing"),
     tags: z.string().optional().describe("Comma-separated keywords that should wake this book later"),
     tl_dr: z.string().optional().describe("A 3-line summary card. If omitted, one is derived automatically from the summary."),
+    architecture_digest: z.string().optional().describe("If codebase-memory-mcp is available, call its get_architecture tool first and paste the digest here — the book then carries the REAL structure summary (languages, routes, hotspots)."),
+    project_dir: z.string().optional().describe("Workspace root, used to record the CBM graph artifact's provenance (.codebase-memory/graph.db.zst hash). Defaults to the server's cwd."),
   },
-  async ({ summary, tags, tl_dr }) => {
+  async ({ summary, tags, tl_dr, architecture_digest, project_dir }) => {
     const consolidated = await brain.consolidateAndCleanSession();
     const tagList = ["project-book", currentProjectId, ...(tags || "").split(",").map((s) => s.trim()).filter(Boolean)];
+    const cbm = probeCbmArtifact(project_dir || process.cwd());
+    const sections = [
+      summary,
+      architecture_digest ? `\n## Architecture (from codebase-memory-mcp)\n${architecture_digest}` : "",
+      cbm ? `\n## Codebase Graph Provenance\nCBM artifact: ${cbm.path} · ${(cbm.size / 1024).toFixed(0)} KB · sha256 ${cbm.sha256.slice(0, 16)}… (rebuildable locally; the graph itself stays off-chain)` : "",
+      `\n[shelved by ${sourceModel} on ${new Date().toISOString().slice(0, 10)}]`,
+    ].filter(Boolean).join("\n");
     const bookId = await brain.createBook(
       `Project: ${currentProjectId}`,
-      `${summary}\n\n[shelved by ${sourceModel} on ${new Date().toISOString().slice(0, 10)}]`,
+      sections,
       tagList,
       "complete",
       { tlDr: tl_dr, domainContext: currentDomain, origin: "agent", sourceModel },
     );
-    return text(`📚 Shelved as ${bookId} (tags: ${tagList.join(", ")}${currentDomain ? `, domain: ${currentDomain}` : ""}).\n${consolidated}`);
+    return text(`📚 Shelved as ${bookId} (tags: ${tagList.join(", ")}${currentDomain ? `, domain: ${currentDomain}` : ""}${cbm ? " · CBM graph provenance recorded" : ""}${architecture_digest ? " · architecture digest embedded" : ""}).\n${consolidated}`);
   },
 );
 

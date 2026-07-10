@@ -19,9 +19,11 @@
  *    node scripts/identity-evolve.mjs --history                     # timeline (read-only)
  *    node scripts/identity-evolve.mjs --set project_name="New Name" # stage a change (dry-run)
  *    node scripts/identity-evolve.mjs --set brand="X" --commit      # sign + append new version
+ *    node scripts/identity-evolve.mjs --promote [--commit]          # record a librarian-rank promotion
  */
 
 import { MemWal } from "@mysten-incubation/memwal";
+import { WalrusEternalBrain } from "eternal-agent-brain-core";
 import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { verifyPersonalMessageSignature } from "@mysten/sui/verify";
@@ -49,6 +51,7 @@ if (!ACCOUNT_ID || !DELEGATE_KEY) { console.error("❌ Missing memwal env"); pro
 
 const COMMIT = process.argv.includes("--commit");
 const HISTORY = process.argv.includes("--history");
+const PROMOTE = process.argv.includes("--promote");
 const NOW = Date.now();
 
 // Parse --set key=value pairs
@@ -192,6 +195,38 @@ async function main() {
     return;
   }
 
+  // ── Phase 13-C: librarian-rank promotion = a page in the life story ──
+  if (PROMOTE) {
+    const brain = new WalrusEternalBrain({ delegateKeyHex: DELEGATE_KEY, accountId: ACCOUNT_ID, serverUrl: SERVER_URL });
+    const m = await brain.computeMaturity();
+    const recorded = current?.librarian_rank || "Blank Slate";
+    const recordedLevel = current?.librarian_level || 0;
+    console.log(`\n🎓 Maturity (from on-chain metrics): ${m.rank} (level ${m.level})`);
+    console.log(`   metrics: ${Object.entries(m.metrics).map(([k, v]) => `${k}=${v}`).join(" · ")}`);
+    if (m.next) console.log(`   next: ${m.next.rank} — missing: ${m.next.missing.join("; ")}`);
+    console.log(`   recorded in identity: ${recorded} (level ${recordedLevel})`);
+    if (m.level <= recordedLevel) {
+      console.log("   → No promotion due (computed rank does not exceed the recorded one).");
+      return;
+    }
+    const base = current || { version: 0, dev_wallet: owner };
+    const next = {
+      ...base,
+      type: "BRAIN_IDENTITY",
+      version: (base.version || 0) + 1,
+      prev_version: base.version || 0,
+      changed_at: NOW,
+      changed_fields: ["librarian_rank", "librarian_level"],
+      dev_wallet: owner || base.dev_wallet,
+      librarian_rank: m.rank,
+      librarian_level: m.level,
+      promotion_metrics: m.metrics, // the evidence, frozen into the story
+    };
+    console.log(`\n🎓 PROMOTION: ${recorded} → ${m.rank} (identity v${next.version})`);
+    await signAndAppend(next, `Promotion to ${m.rank}`);
+    return;
+  }
+
   if (HISTORY || (!Object.keys(sets).length)) {
     console.log(`\n📖 ═══ Character Development History (${versions.length} versions) ═══`);
     for (const v of versions) {
@@ -201,7 +236,8 @@ async function main() {
         catch { sigOk = "✗ bad-sig"; }
       }
       const when = v.changed_at ? new Date(v.changed_at).toISOString().slice(0, 10) : "seed";
-      console.log(`   v${v.version} [${when}] ${sigOk}  wallet ${short(v.dev_wallet)} · project "${v.project_name || "?"}"`);
+      const rank = v.librarian_rank ? ` · 🎓 ${v.librarian_rank}` : "";
+      console.log(`   v${v.version} [${when}] ${sigOk}  wallet ${short(v.dev_wallet)} · project "${v.project_name || "?"}"${rank}`);
       if ((v.changed_fields || []).length) console.log(`        changed: ${v.changed_fields.join(", ")}`);
     }
     return;

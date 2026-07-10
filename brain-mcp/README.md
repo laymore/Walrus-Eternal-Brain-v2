@@ -13,16 +13,37 @@ npm install
 npm run build      # → dist/server.js
 ```
 
+## Division of labor with codebase-memory-mcp (recommended pairing)
+
+Run this server **side-by-side** with [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)
+(one-line install; it auto-configures Claude Code, Antigravity, Cursor, and 8 other clients):
+
+> **Ask CBM about the code. Ask the brain about the lessons.**
+
+| Question | Tool to use |
+|---|---|
+| "Who calls `processOrder`?" / structure, routes, impact of a diff | CBM (`search_graph`, `trace_path`, `detect_changes`, `get_architecture`) |
+| "How did we solve this class of problem before?" / gotchas, playbooks | brain (`brain_consult_library`, `brain_read_book`) |
+| Start / finish a project | brain (`brain_start_project` / `brain_shelve_project` — pass CBM's `get_architecture` digest into `architecture_digest` so the book carries the real structure summary) |
+
+Memory tiering: your **short-term memory is your own context window**; the
+**codebase structure** lives in CBM's local, rebuildable graph (never pushed
+on-chain); the **Eternal Library** stores only distilled, precious knowledge —
+`brain_remember` enforces this (importance gate, dedup, session budget).
+
 ## Tools
 
 | Tool | What it does |
 |---|---|
 | `brain_recall` | Pull context-optimized memory (Eternal Library + session) for a query — call BEFORE acting to save tokens. |
-| `brain_consult_library` | When stuck, pull cross-project reference "books" (distilled reusable knowledge). |
-| `brain_remember` | Record a working trace / fix into the Thinking Brain (tagged with `BRAIN_SOURCE_MODEL`). |
+| `brain_consult_library` | When stuck, pull cross-project TL;DR cards (optionally filtered by `domain`). |
+| `brain_read_book` | Pull the FULL text of one book by `book_id` after its TL;DR looks relevant. |
+| `brain_remember` | Persist ONE precious insight (importance 1–5; <3 refused, near-duplicates skipped, session budget 20). |
 | `brain_consolidate` | Crystallize the session's working memory into durable facts (end-of-session "sleep"). |
-| `brain_identity` | Who this brain is: identity + development-history version count. |
+| `brain_identity` | Universal Identity in your framework's format + current **librarian rank** (maturity from on-chain metrics). |
 | `brain_library` | List the book-neurons (title, version, tags) + synapse count. |
+| `brain_start_project` | Open a project namespace + kickoff briefing from the library (accepts `domain`). |
+| `brain_shelve_project` | Finish a project: consolidate + shelve as a book (accepts `tl_dr`, `architecture_digest` from CBM, `project_dir` for graph-artifact provenance). |
 
 ## Configure a client (example)
 

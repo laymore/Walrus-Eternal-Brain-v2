@@ -2,6 +2,15 @@ import * as fs from "fs";
 import * as path from "path";
 
 /**
+ * @deprecated Phase 13-A: superseded by COMPOSITION with codebase-memory-mcp
+ * (github.com/DeusData/codebase-memory-mcp) — a compiled Tree-sitter/LSP/SQLite
+ * engine this regex stub can never match. Kept only as a type/interface
+ * fallback when CBM is absent; the real structural graph lives in CBM's
+ * `.codebase-memory/graph.db.zst` artifact, whose provenance (hash+size) is
+ * recorded in shelved books by brain_shelve_project.
+ */
+
+/**
  * Interface cho một node trong Knowledge Graph
  */
 export interface GraphNode {

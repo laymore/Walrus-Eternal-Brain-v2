@@ -59,6 +59,11 @@ const LIBRARY_MAX_DISTANCE = 0.55; // ~0.45 min similarity
 const SESSION_MAX_DISTANCE = 0.75; // ~0.25 min similarity
 const CONSOLIDATE_MAX_DISTANCE = 0.9; // sweep almost everything in the session
 const CONSOLIDATE_BATCH = 15; // traces per analyze() call (avoid context overflow)
+// Selective ingestion (Phase 13-B): the write-gate. Models keep routine
+// context in their own short-term memory; the brain persists only importance
+// ≥ 3 traces, and never a near-duplicate of something already remembered.
+const WRITE_GATE_MIN_IMPORTANCE = 3;
+const DEDUP_MAX_DISTANCE = 0.12; // recall distance below this = "already known"
 // Topology graph tuning (edges via term-overlap; see fetchBrainTopology)
 const TOPO_MAX_NODES = 40; // cap nodes for a readable graph
 const TOPO_EDGES_PER_NODE = 2; // K nearest neighbours per node
@@ -275,6 +280,70 @@ export class WalrusEternalBrain {
             return null;
         }
     }
+    /**
+     * LIBRARIAN MATURITY (Phase 13-C): growth stages computed from REAL on-chain
+     * metrics — never self-declared. A rank crossing is recorded as a signed
+     * identity version (see identity-evolve --promote), so the librarian's
+     * coming-of-age story lives in the same append-only history as everything else.
+     */
+    async computeMaturity() {
+        const shelf = await this.fetchLibraryNeurons();
+        const books = shelf.nodes.filter((n) => !n.isGraph);
+        const domains = new Set(books.map((b) => b.domain_context).filter(Boolean));
+        const errata = Object.values(shelf.corrections).reduce((a, v) => a + v.length, 0);
+        let identityVersions = 0;
+        try {
+            identityVersions = (await this.fetchIdentityHistory()).length;
+        }
+        catch { /* none yet */ }
+        // Calibration signal from Phase 5 snapshots (NS_BRAIN_meta).
+        let calibrated = 0;
+        try {
+            const res = await this.clientFor("NS_BRAIN_meta").recall({ query: "CONFIDENCE_CALIBRATION calibration stated observed", limit: 10, maxDistance: 0.95 });
+            const snaps = res.results
+                .map((r) => { try {
+                return JSON.parse(r.text);
+            }
+            catch {
+                return null;
+            } })
+                .filter((x) => x?.subtype === "CONFIDENCE_CALIBRATION")
+                .sort((a, b) => (a.generated_at || 0) - (b.generated_at || 0));
+            const latestCal = snaps[snaps.length - 1];
+            calibrated = (latestCal?.calibrations || []).filter((c) => c.verdict === "calibrated").length;
+        }
+        catch { /* no calibration snapshots yet */ }
+        const metrics = {
+            books: books.length,
+            synapses: shelf.links.length,
+            errata,
+            domains: domains.size,
+            calibrated,
+            identity_versions: identityVersions,
+        };
+        // Stage ladder — each rank names what a real librarian must have DONE.
+        const STAGES = [
+            { rank: "Novice Scribe", needs: [["identity_versions", 1, "an identity"]] },
+            { rank: "Apprentice Librarian", needs: [["books", 3, "3 books shelved"]] },
+            { rank: "Archivist", needs: [["books", 7, "7 books"], ["errata", 1, "1 errata filed (corrects the record)"]] },
+            { rank: "Curator", needs: [["books", 12, "12 books"], ["synapses", 1, "1 synapse"], ["calibrated", 1, "1 calibrated skill"]] },
+            { rank: "Master Librarian", needs: [["books", 20, "20 books"], ["domains", 2, "2 domains covered"]] },
+            { rank: "Eternal Librarian", needs: [["books", 40, "40 books"], ["domains", 3, "3 domains"], ["synapses", 5, "5 synapses"]] },
+        ];
+        let level = 0;
+        for (let i = 0; i < STAGES.length; i++) {
+            if (STAGES[i].needs.every(([k, min]) => metrics[k] >= min))
+                level = i + 1;
+            else
+                break;
+        }
+        const rank = level === 0 ? "Blank Slate" : STAGES[level - 1].rank;
+        const nextStage = STAGES[level] || null;
+        const next = nextStage
+            ? { rank: nextStage.rank, missing: nextStage.needs.filter(([k, min]) => metrics[k] < min).map(([k, min, label]) => `${label} (${metrics[k]}/${min})`) }
+            : null;
+        return { rank, level, metrics, next };
+    }
     /** BOOK DETAIL: every version of one book_id, oldest → newest. */
     async fetchBookHistory(bookId) {
         const res = await this.eternalLibrary.recall({ query: bookId, limit: 40, maxDistance: 0.98 });
@@ -317,6 +386,35 @@ export class WalrusEternalBrain {
     async recordExecutionTrace(actionTrace) {
         const job = await this.thinkingBrain.remember(actionTrace);
         await this.thinkingBrain.waitForRememberJob(job.job_id);
+    }
+    /**
+     * SELECTIVE INGESTION (Phase 13-B): the write-gate for working traces.
+     * Every model already has its own short-term memory — the brain persists
+     * only what is genuinely worth keeping:
+     *  - importance gate: below the threshold, the write is refused with
+     *    guidance to keep it in the model's own context.
+     *  - dedup-before-write: recall first; if a near-duplicate trace already
+     *    exists, skip the write and say so (no piling identical traces).
+     */
+    async rememberSelective(trace, importance) {
+        if (!Number.isFinite(importance) || importance < WRITE_GATE_MIN_IMPORTANCE) {
+            return {
+                written: false,
+                reason: `Refused (importance ${importance} < ${WRITE_GATE_MIN_IMPORTANCE}). Routine context belongs in your own short-term memory — persist only durable, reusable knowledge (importance ${WRITE_GATE_MIN_IMPORTANCE}-5).`,
+            };
+        }
+        try {
+            const dupes = await this.thinkingBrain.recall({ query: trace, limit: 3, maxDistance: DEDUP_MAX_DISTANCE });
+            if (dupes.results.length > 0) {
+                return {
+                    written: false,
+                    reason: `Already known — a near-duplicate trace exists (distance < ${DEDUP_MAX_DISTANCE}): "${String(dupes.results[0].text || "").slice(0, 80)}…". Not re-written.`,
+                };
+            }
+        }
+        catch { /* dedup probe failed (e.g. empty namespace) — proceed to write */ }
+        await this.recordExecutionTrace(trace);
+        return { written: true, reason: "Recorded to the Thinking Brain." };
     }
     /**
      * INTEGRATED RETRIEVAL: Pull context-optimized knowledge, saving API tokens
