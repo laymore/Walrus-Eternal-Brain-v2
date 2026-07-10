@@ -165,3 +165,33 @@ The "2-chamber vs 5-tier" question is resolved as **two different scopes, not co
 - [x] **Language-Barrier Fix (bonus, from the logic audit)** — `phase5-metacognition-engine.mjs` no longer assesses hardcoded English actions against possibly-Vietnamese memory. When no `--action` is given, candidate actions are derived from the agent's own recent episodic summaries (same language as what's actually stored). Verified live: assessed 5 real Vietnamese actions at 90–97% confidence, evidence-grounded — the old hardcoded-English list would have matched weakly against the same memories.
 
 > **Build-health note:** external edits (Active Forgetting via `clearThinkingBrain()` epoch-rotation, RPC failover in `identity-evolve.mjs`, per-session mutex in `agent-api/server.ts`, and the `graph-builder.ts` scaffold below) had broken the core TypeScript build (private-field access + missing `@types/node`) before this phase started — fixed first, verified across core + app + brain-mcp + agent-api + all touched scripts.
+
+## Phase 13: The Grand Librarian — CBM Composition, Selective Memory & Maturity
+*Goal restated: the agent is a **Librarian/Keeper (quản thủ thư)** with growth stages and its own coming-of-age story, who imports/exports knowledge **only when necessary** — every model already has short-term memory of its own; the Eternal Library archives only what is precious.*
+
+> **Integration verdict on [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) (CBM):** re-reviewed. It's a compiled C binary — vendored Tree-sitter (158 languages), hybrid LSP (12 languages), SQLite graph with zstd artifact sharing (`.codebase-memory/graph.db.zst`), bundled Nomic embeddings, 14 MCP tools, Linux-kernel-scale performance. **Do not absorb its code — COMPOSE with it.** Our `graph-builder.ts` regex stub can never catch up and doesn't need to: CBM covers the *structural memory of the current codebase* (local, free, rebuildable in minutes — safe to forget), while the Eternal Library covers *cross-project wisdom* (permanent, curated, on-chain). Two MCPs side-by-side; we build the bridges.
+
+**Memory tiering doctrine (the "selective ingestion" contract):**
+| Tier | Where | Nature | Write policy |
+|---|---|---|---|
+| Short-term | the model's own context window | already exists | never persisted by us |
+| Codebase structure | CBM local graph | rebuildable, disposable | never pushed on-chain |
+| Working traces | Thinking Brain (epoch-rotated, actively forgotten) | temporary | light gate |
+| Books | Eternal Library (Walrus) | eternal | **strict gate — distilled, precious only** |
+
+**A. CBM Composition (bridges, not reimplementation):**
+- [ ] **A1. Side-by-side config recipe** — document running `codebase-memory-mcp` + `brain-mcp` together (install script auto-configures 11 agents incl. Antigravity/Claude Code); division of labor in both READMEs: *ask CBM about the code, ask the brain about the lessons*.
+- [ ] **A2. Architecture digest bridge** — Project Compressor & `brain_shelve_project` call CBM's `get_architecture` (when its MCP/artifact is present) to embed a REAL architecture summary (languages, routes, hotspots) in the project book — replacing the regex stub's role.
+- [ ] **A3. Graph artifact archiving** — at shelve time, if `.codebase-memory/graph.db.zst` exists, record its hash + size + summary in the book (provenance pointer); optionally upload the raw artifact to Walrus as a true `GRAPH_BLOB` via `@mysten/walrus` (deferred until blob-upload is wired — MemWal `remember()` is text-only).
+- [ ] **A4. Retire the stub** — mark `graph-builder.ts` deprecated (kept only as a fallback interface); the real graph engine is CBM.
+
+**B. Selective Ingestion — "import only when necessary":**
+- [ ] **B1. Write-gate on `brain_remember`** — new `importance` param (1–5) + the tool description instructs models to keep routine context in their own short-term memory; below-threshold writes are rejected with that guidance.
+- [ ] **B2. Dedup-before-write** — `brain_remember` recalls first; if a near-duplicate memory already exists, skip the write and answer "already known" (optionally bump a confirmation counter) — no more piling identical traces.
+- [ ] **B3. Checkpoint-only book writing** — books are born ONLY at checkpoints (`brain_shelve_project`, Promotion Engine, Compressor) — never from a continuous stream. Already the case; codify it in tool descriptions + docs as doctrine.
+- [ ] **B4. Session write budget** — soft cap on traces per session (e.g. 20); past the cap, `brain_remember` asks the agent to distill instead of append.
+
+**C. Librarian Maturity — growth stages with a real story:**
+- [ ] **C1. `computeMaturity()`** in core — rank derived from REAL on-chain metrics (books shelved, synapses, errata filed, calibration verdicts from Phase 5, identity versions, domains covered). Stages: **Novice Scribe → Apprentice → Archivist → Curator → Master Librarian → Eternal Librarian**. Each stage has named thresholds (e.g. Archivist requires ≥1 errata filed — a librarian who corrects the record).
+- [ ] **C2. Promotion = a page in the life story** — when the rank crosses a threshold, append a **signed identity version** ("promoted to Curator", with the metrics snapshot) via the Identity Evolution Protocol — the growth story lives in the same append-only history book as everything else.
+- [ ] **C3. Surface it** — BrainView shows the rank badge + progress to next stage; `brain_identity` includes the rank in the system-prompt projection ("You are …, an **Archivist-rank** librarian") so every model *feels* its maturity.
