@@ -122,12 +122,18 @@ of this project.
   | Namespace | Blobs | What's in it |
   |---|---|---|
   | `eternal:global:associative-core` (Eternal Library) | 19 | 9 distinct "books" (multi-version) + synapses + 1 filed correction |
-  | `NS_BRAIN_identity` | 5 | 5 signed identity versions — the agent's own append-only life story |
+  | `NS_BRAIN_identity` | 6 | 6 signed identity versions — the agent's own append-only life story (latest records this submission's milestone: public repo + Prompt Jam entry) |
   | `NS_BRAIN_semantic` | 24 | distilled facts consolidated from working sessions |
   | `NS_BRAIN_procedural` | 18 | derived skills with real success-rate tracking |
   | `NS_BRAIN_meta` | 22 | self-assessment / calibration snapshots |
   | `NS_BRAIN_episodic` | 8 | raw event records |
-  | **Total sampled** | **96** | across 6 active namespaces |
+  | **Total sampled** | **97** | across 6 active namespaces |
+
+  The agent has also crossed a maturity threshold from its own book-shelving
+  history: `computeMaturity()` (derived from real metrics — books, synapses,
+  errata filed — never self-declared) currently ranks it **Archivist
+  (level 3)**, recorded as a signed identity version alongside the rest of
+  this history.
 
 - **A specific, fresh proof blob** written live for this submission, exercising the exact write-gate rule from §3.1 (importance-scored, checked for duplicates before writing):
   **Blob ID:** `rcWgW-MeUM7m0upKyfYLuqQIyx23h1crnVyZlGgQbJ0`
@@ -152,6 +158,9 @@ of this project.
   `brain-mcp` is the MCP server exposing these tools to any client, `HELPER.md`
   is the full architecture writeup, `ROADMAP.md` has the implementation history
   with live-verification notes for every mechanism claimed above)
+- **Live dashboard (public, no setup needed):** https://chats.wal.app — a Walrus
+  Site reading the same on-chain account live. Connect any Sui wallet to browse
+  the actual shelf, the identity's version history, and the activity ledger.
 
 ## 5. Demo Video
 
