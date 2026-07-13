@@ -4,7 +4,7 @@ import { useBrain } from '../contexts/BrainContext';
 
 export function BrainManager({ children }: { children: React.ReactNode }) {
   const account = useCurrentAccount();
-  const { brain, accountId, hasDeviceKey, isLoading, createBrain, authorizeDevice, error } = useBrain();
+  const { brain, accountId, hasDeviceKey, deviceKeyInvalid, isLoading, createBrain, authorizeDevice, error } = useBrain();
 
   if (!account) {
     return (
@@ -62,6 +62,25 @@ export function BrainManager({ children }: { children: React.ReactNode }) {
         </p>
         <button className="btn btn--primary" onClick={authorizeDevice} style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
           Authorize Device (Approve Tx)
+        </button>
+      </div>
+    );
+  }
+
+  // State 2.5: A device key exists locally but the relayer rejects it (revoked,
+  // or the registration tx never actually landed on-chain). Without this,
+  // every view just renders empty forever with no way out — this offers the
+  // same "Authorize Device" flow again, which overwrites the stale local key.
+  if (deviceKeyInvalid) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '2rem', textAlign: 'center' }}>
+        <h2 style={{ color: '#ffaa00' }}>⚠️ This Device's Key Is No Longer Valid</h2>
+        <p style={{ color: 'var(--text-dim)', marginBottom: '2rem', maxWidth: '420px' }}>
+          Your Agent Brain exists, but this browser's saved key was rejected (revoked, or it was
+          never fully registered on-chain). Re-authorize this device to get a fresh, working key.
+        </p>
+        <button className="btn btn--primary" onClick={authorizeDevice} style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
+          Re-authorize Device (Approve Tx)
         </button>
       </div>
     );

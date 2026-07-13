@@ -8,6 +8,7 @@ interface BrainContextState {
   brain: WalrusEternalBrain | null;
   accountId: string | null;
   hasDeviceKey: boolean;
+  deviceKeyInvalid: boolean;
   isLoading: boolean;
   createBrain: () => Promise<void>;
   authorizeDevice: () => Promise<void>;
@@ -18,6 +19,7 @@ const BrainContext = createContext<BrainContextState>({
   brain: null,
   accountId: null,
   hasDeviceKey: false,
+  deviceKeyInvalid: false,
   isLoading: true,
   createBrain: async () => {},
   authorizeDevice: async () => {},
@@ -32,6 +34,7 @@ export function BrainProvider({ children }: { children: React.ReactNode }) {
   const [brain, setBrain] = useState<WalrusEternalBrain | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [hasDeviceKey, setHasDeviceKey] = useState(false);
+  const [deviceKeyInvalid, setDeviceKeyInvalid] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,12 +47,14 @@ export function BrainProvider({ children }: { children: React.ReactNode }) {
       setBrain(null);
       setAccountId(null);
       setHasDeviceKey(false);
+      setDeviceKeyInvalid(false);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     setError(null);
+    setDeviceKeyInvalid(false);
     try {
       // 1. Check if user has an account in the Registry
       let foundAccountId: string | null = null;
@@ -75,14 +80,25 @@ export function BrainProvider({ children }: { children: React.ReactNode }) {
       const localKey = localStorage.getItem(`memwal_delegate_key_${account.address}`);
       setHasDeviceKey(!!localKey);
 
-      // 3. Initialize brain if both exist
+      // 3. Initialize brain if both exist — but a key stored locally isn't
+      // proof it's still valid on-chain (revoked, or the tx that registered
+      // it never actually landed). Probe once with a cheap call so a stale
+      // key surfaces as an explicit "re-authorize" prompt instead of leaving
+      // every view silently empty forever (401s swallowed downstream).
       if (foundAccountId && localKey) {
         const nb = new WalrusEternalBrain({
           delegateKeyHex: localKey,
           accountId: foundAccountId,
           serverUrl: SERVER_URL,
         });
-        setBrain(nb);
+        try {
+          await nb.fetchIdentityHistory();
+          setBrain(nb);
+        } catch (probeErr: any) {
+          console.error("Device key probe failed — treating as invalid:", probeErr);
+          setBrain(null);
+          setDeviceKeyInvalid(true);
+        }
       } else {
         setBrain(null);
       }
@@ -161,6 +177,7 @@ export function BrainProvider({ children }: { children: React.ReactNode }) {
       });
 
       localStorage.setItem(`memwal_delegate_key_${account.address}`, delegate.privateKey);
+      setDeviceKeyInvalid(false);
       await checkBrainState();
     } catch (err: any) {
       console.error(err);
@@ -170,7 +187,7 @@ export function BrainProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <BrainContext.Provider value={{ brain, accountId, hasDeviceKey, isLoading, createBrain, authorizeDevice, error }}>
+    <BrainContext.Provider value={{ brain, accountId, hasDeviceKey, deviceKeyInvalid, isLoading, createBrain, authorizeDevice, error }}>
       {children}
     </BrainContext.Provider>
   );

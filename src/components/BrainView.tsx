@@ -15,7 +15,9 @@ export function BrainView() {
     brain.fetchIdentityHistory()
       .then((v) => { if (alive) { setVersions(v); setLoading(false); } })
       .catch(() => { if (alive) { setVersions([]); setLoading(false); } });
-    brain.computeMaturity().then((m: any) => { if (alive) setMaturity(m); }).catch(() => {});
+    if (brain.computeMaturity) {
+      brain.computeMaturity().then((m: any) => { if (alive) setMaturity(m); }).catch(() => {});
+    }
     return () => { alive = false; };
   }, [brain]);
 
