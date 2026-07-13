@@ -62,7 +62,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
       <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textAlign: 'center' }}>
-          Eternal Agent Brain v1.1
+          Eternal Library v6
         </div>
       </div>
     </aside>
