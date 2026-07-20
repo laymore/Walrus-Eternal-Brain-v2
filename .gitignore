@@ -6,3 +6,6 @@ dist/
 logs/
 .DS_Store
 Thumbs.db
+
+# Machine-specific skill symlinks (real content lives in .agents/skills/)
+.claude/skills/
