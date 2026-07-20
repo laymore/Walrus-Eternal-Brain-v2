@@ -21,6 +21,22 @@ export interface ConceptCell {
 const bookIdFromTitle = (t: unknown) =>
   `book:${String(t || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 
+// Emergent synapses (Phase 14, distilled from javis-os): an agent that writes
+// `[[Another Book Title]]` inside a book's content is declaring a link — just
+// like an Obsidian/Roam wiki. We resolve those to canonical book_ids at READ
+// time, so the neuron map grows richer straight from natural writing with ZERO
+// extra blobs written (Walrus is append-only; deriving beats storing here).
+export function extractWikiLinks(content: unknown): string[] {
+  const out = new Set<string>();
+  const re = /\[\[([^\]]+)\]\]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(String(content || ""))) !== null) {
+    const target = m[1].split("|")[0].trim(); // support [[Title|alias]]
+    if (target) out.add(bookIdFromTitle(target));
+  }
+  return [...out];
+}
+
 // TL;DR index card (Phase 12): a 3-line summary so consultLibrary can return
 // cheap cards first — the agent only pulls full text via getBookContent() /
 // brain_read_book when the card looks relevant. Prevents context-window bloat.
@@ -244,7 +260,26 @@ export class WalrusEternalBrain {
       };
     });
     const nodeIds = new Set(nodes.map((n) => n.id));
-    return { nodes, links: links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target)), corrections };
+    const lineage = links
+      .filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target))
+      .map((l) => ({ ...l, kind: "lineage" }));
+
+    // Emergent wiki-synapses: derive edges from [[wikilinks]] in each book's
+    // content (Phase 14, from javis-os). Resolved at read time, deduped against
+    // explicit lineage links so an already-declared pair isn't drawn twice.
+    const seen = new Set(lineage.map((l) => `${l.source}→${l.target}`));
+    const wiki: any[] = [];
+    for (const n of nodes) {
+      if (n.isGraph) continue;
+      for (const target of extractWikiLinks(n.content)) {
+        if (target === n.id || !nodeIds.has(target)) continue;
+        const key = `${n.id}→${target}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        wiki.push({ source: n.id, target, reason: "mentioned in text", kind: "wikilink" });
+      }
+    }
+    return { nodes, links: [...lineage, ...wiki], corrections };
   }
 
   /** ADD BOOK: shelve a new book-neuron (v1) into the Eternal Library (agent-driven). */

@@ -148,7 +148,9 @@ server.tool(
   async () => {
     const g = await brain.fetchLibraryNeurons();
     const list = g.nodes.map((n: any) => `• ${n.label} v${n.version} [${(n.tags || []).join(", ")}]`).join("\n");
-    return text(`${g.nodes.length} neurons · ${g.links.length} synapses\n${list}`);
+    const lineage = g.links.filter((l: any) => l.kind !== "wikilink").length;
+    const wiki = g.links.filter((l: any) => l.kind === "wikilink").length;
+    return text(`${g.nodes.length} neurons · ${lineage} lineage + ${wiki} wiki synapses\n${list}`);
   },
 );
 
@@ -180,7 +182,7 @@ server.tool(
   "brain_shelve_project",
   "Call this when a project is DONE. Consolidates the session's working memory into the Eternal Library and shelves the project as a book (with lessons), so the next project can consult it. Closes the learn-loop.",
   {
-    summary: z.string().describe("What was built + key lessons/gotchas worth reusing"),
+    summary: z.string().describe("What was built + key lessons/gotchas worth reusing. TIP: mention a related past book by its exact title in [[double brackets]] (e.g. [[Walrus Deploy Playbook]]) — the neuron map auto-draws a synapse to it, no separate linking step needed."),
     tags: z.string().optional().describe("Comma-separated keywords that should wake this book later"),
     tl_dr: z.string().optional().describe("A 3-line summary card. If omitted, one is derived automatically from the summary."),
     architecture_digest: z.string().optional().describe("If codebase-memory-mcp is available, call its get_architecture tool first and paste the digest here — the book then carries the REAL structure summary (languages, routes, hotspots)."),

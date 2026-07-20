@@ -101,8 +101,13 @@ export function LibraryView() {
         ) : (
           <ForceGraph2D
             width={dims.width} height={dims.height} graphData={graph} backgroundColor={c.bg}
-            nodeLabel="label" nodeRelSize={5} linkColor={() => c.link}
-            linkWidth={0.8} linkDirectionalArrowLength={3} linkDirectionalArrowRelPos={1}
+            nodeLabel="label" nodeRelSize={5}
+            // Emergent [[wiki]] synapses render dimmer + thinner than declared
+            // lineage links, so you can tell "mentioned in text" from "reused code".
+            linkColor={(l: any) => (l.kind === 'wikilink' ? '#6a6a8a' : c.link)}
+            linkWidth={(l: any) => (l.kind === 'wikilink' ? 0.4 : 0.8)}
+            linkLineDash={(l: any) => (l.kind === 'wikilink' ? [3, 3] : null)}
+            linkDirectionalArrowLength={3} linkDirectionalArrowRelPos={1}
             d3AlphaDecay={0.05} d3VelocityDecay={0.25}
             onNodeClick={openNode}
             onBackgroundClick={() => setSelected(null)}

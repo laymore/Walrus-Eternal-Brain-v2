@@ -12,6 +12,7 @@ export interface ConceptCell {
     factPayload: string;
     timestamp: number;
 }
+export declare function extractWikiLinks(content: unknown): string[];
 export declare function deriveTlDr(content: unknown, maxChars?: number): string;
 export interface UniversalIdentity {
     type?: string;
